@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orchestrator Pro</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Orchestrator Pro</h1>
+        <p>Deploy and manage your complex system via this web interface.</p>
+        
+        <div class="editor-container">
+            <textarea id="config-editor" placeholder="Configuration JSON will appear here..."></textarea>
+        </div>
+        
+        <div class="button-group">
+            <button id="load-btn">Load from GitHub</button>
+            <button id="save-btn">Save to GitHub</button>
+            <button id="deploy-btn">Run Docker Deploy</button>
+        </div>
+        
+        <div id="status-message"></div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

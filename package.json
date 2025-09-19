@@ -1,0 +1,26 @@
+{
+  "name": "orchestrator-pro",
+  "version": "1.0.0",
+  "description": "A tool to deploy and manage complex systems via CLI and Web UI.",
+  "type": "module",
+  "main": "src/cli/index.js",
+  "bin": {
+    "orchestrator-pro": "./src/cli/index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/web/server.js",
+    "cli": "node src/cli/index.js"
+  },
+  "keywords": ["cli", "web", "automation", "deploy"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "dotenv": "^16.4.5",
+    "execa": "^8.0.1",
+    "express": "^4.19.2",
+    "inquirer": "^9.2.20",
+    "octokit": "^3.2.1"
+  }
+}
