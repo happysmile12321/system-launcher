@@ -43,6 +43,13 @@
           </button>
           <button 
             class="rounded-lg px-4 py-2 text-sm font-medium transition" 
+            :class="activeTab === 'containers' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
+            @click="activeTab = 'containers'"
+          >
+            容器管理
+          </button>
+          <button 
+            class="rounded-lg px-4 py-2 text-sm font-medium transition" 
             :class="activeTab === 'settings' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
             @click="activeTab = 'settings'"
           >
@@ -55,7 +62,7 @@
     <main class="mx-auto max-w-7xl px-6 py-8">
       <!-- 工作流页面 -->
       <template v-if="activeTab === 'workflows'">
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_1.8fr_18rem]">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_1fr]">
       <!-- Workflow list + metadata -->
       <section class="flex h-full flex-col gap-4">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur">
@@ -123,6 +130,57 @@
                 placeholder="这里记录流程的业务背景和目标"
               />
             </div>
+            
+            <!-- 触发器配置 -->
+            <div>
+              <label class="text-xs font-medium text-slate-400">触发器类型</label>
+              <select
+                v-model="currentWorkflow.trigger.type"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+              >
+                <option value="cron">定时任务 (Cron)</option>
+                <option value="webhook">Webhook</option>
+              </select>
+            </div>
+            
+            <div v-if="currentWorkflow.trigger.type === 'cron'">
+              <label class="text-xs font-medium text-slate-400">Cron 表达式</label>
+              <div class="mt-1 flex items-center gap-2">
+                <input
+                  v-model="currentWorkflow.trigger.cronExpression"
+                  type="text"
+                  class="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                  placeholder="如：0 * * * *"
+                />
+                <button
+                  class="rounded-lg border border-emerald-500 px-3 py-2 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/10"
+                  @click="showCronHelper = true"
+                >
+                  AI助手
+                </button>
+              </div>
+              <p class="mt-1 text-xs text-slate-500">使用AI助手生成Cron表达式，或手动输入</p>
+            </div>
+            
+            <div v-if="currentWorkflow.trigger.type === 'webhook'">
+              <label class="text-xs font-medium text-slate-400">Webhook URL</label>
+              <div class="mt-1 flex items-center gap-2">
+                <input
+                  :value="`${window.location.origin}/api/webhook/${currentWorkflow.id}`"
+                  type="text"
+                  readonly
+                  class="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-300 focus:border-sky-500 focus:outline-none"
+                />
+                <button
+                  class="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-600"
+                  @click="copyWebhookUrl"
+                >
+                  复制
+                </button>
+              </div>
+              <p class="mt-1 text-xs text-slate-500">使用此URL作为Webhook端点</p>
+            </div>
+            
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-medium text-slate-400">是否启用</p>
@@ -137,90 +195,8 @@
         </div>
       </section>
 
-      <!-- Trigger + Step editor -->
+      <!-- 工作流步骤编排 -->
       <section class="flex flex-col gap-4">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-300">触发器</h2>
-              <p class="text-xs text-slate-500">阶段一支持 Cron 表达式，可扩展 Webhook 等类型</p>
-            </div>
-            <template v-if="currentWorkflow">
-              <select
-                v-model="currentWorkflow.trigger.type"
-                class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 focus:border-sky-500 focus:outline-none"
-              >
-                <option value="cron">定时任务 (Cron)</option>
-                <option value="webhook">Webhook</option>
-              </select>
-            </template>
-            <template v-else>
-              <select
-                disabled
-                class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-500"
-              >
-                <option>请选择工作流</option>
-              </select>
-            </template>
-          </div>
-
-          <template v-if="currentWorkflow">
-            <div v-if="currentWorkflow.trigger.type === 'cron'" class="mt-5 space-y-3">
-              <label class="text-xs font-medium text-slate-400">Cron 表达式</label>
-              <input
-                v-model="currentWorkflow.trigger.cronExpression"
-                type="text"
-                class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
-                placeholder="如：0 * * * *"
-              />
-              <p class="text-xs text-slate-500">稍后我们会引入可视化的 Cron 生成器，这里先手动填写。</p>
-            </div>
-
-            <div v-else-if="currentWorkflow.trigger.type === 'webhook'" class="mt-5 space-y-3">
-              <label class="text-xs font-medium text-slate-400">Webhook URL</label>
-              <div class="flex items-center gap-2">
-                <input
-                  :value="`${window.location.origin}/api/webhook/${currentWorkflow.id}`"
-                  type="text"
-                  readonly
-                  class="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-300 focus:border-sky-500 focus:outline-none"
-                />
-                <button
-                  class="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-600"
-                  @click="copyWebhookUrl"
-                >
-                  复制
-                </button>
-              </div>
-              <p class="text-xs text-slate-500">
-                使用此URL作为Webhook端点。支持GET和POST请求，任务将异步执行。
-              </p>
-              
-              <div class="mt-4 rounded-lg border border-slate-700 bg-slate-950/80 p-3">
-                <h4 class="text-xs font-medium text-slate-300 mb-2">测试Webhook</h4>
-                <div class="flex gap-2">
-                  <button
-                    class="rounded-lg border border-slate-700 px-3 py-1 text-xs font-medium text-slate-300 transition hover:bg-slate-600"
-                    @click="testWebhook('GET')"
-                  >
-                    测试 GET
-                  </button>
-                  <button
-                    class="rounded-lg border border-slate-700 px-3 py-1 text-xs font-medium text-slate-300 transition hover:bg-slate-600"
-                    @click="testWebhook('POST')"
-                  >
-                    测试 POST
-                  </button>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <div v-else class="mt-5 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 px-4 py-6 text-center text-xs text-slate-500">
-            请选择左侧的工作流后配置触发器。
-          </div>
-        </div>
-
         <div class="flex-1 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur">
           <div class="flex items-center justify-between">
             <div>
@@ -272,20 +248,30 @@
 
               <div class="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
-                  <label class="text-xs font-medium text-slate-400">执行脚本</label>
+                  <label class="text-xs font-medium text-slate-400">选择组件</label>
                   <select
-                    v-model="step.script"
+                    v-model="step.component"
                     class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                    @change="onStepComponentChange(step)"
                   >
-                    <option value="" disabled>请选择脚本</option>
-                    <option v-for="script in scripts" :key="script.name" :value="script.name">{{ script.name }}</option>
+                    <option value="" disabled>请选择组件</option>
+                    <optgroup label="本地组件">
+                      <option v-for="component in systemComponents" :key="`local-${component.name}`" :value="`local:${component.name}`">
+                        {{ component.displayName || component.name }}
+                      </option>
+                    </optgroup>
+                    <optgroup label="用户组件">
+                      <option v-for="component in userComponents" :key="`user-${component.name}`" :value="`user:${component.name}`">
+                        {{ component.displayName || component.name }}
+                      </option>
+                    </optgroup>
                   </select>
-                  <p v-if="!scripts.length" class="mt-2 text-xs text-amber-300/80">没有检测到脚本，请先在 Git 上创建脚本文件。</p>
+                  <p v-if="!systemComponents.length && !userComponents.length" class="mt-2 text-xs text-amber-300/80">没有可用的组件，请先创建组件。</p>
                 </div>
                 <div>
-                  <label class="text-xs font-medium text-slate-400">脚本路径</label>
+                  <label class="text-xs font-medium text-slate-400">组件类型</label>
                   <p class="mt-1 rounded-lg border border-dashed border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-400">
-                    {{ selectedScriptPath(step.script) }}
+                    {{ getStepComponentType(step.component) }}
                   </p>
                 </div>
               </div>
@@ -294,13 +280,91 @@
                 <div class="flex items-center justify-between">
                   <p class="text-xs font-medium text-slate-400">输入参数</p>
                   <button
+                    v-if="!getStepComponentInputs(step).length"
                     class="text-[11px] text-sky-300 hover:underline"
                     @click="addInput(step)"
                   >
                     + 添加输入
                   </button>
                 </div>
-                <div class="mt-3 space-y-2">
+                
+                <!-- 基于组件清单的动态输入表单 -->
+                <div v-if="getStepComponentInputs(step).length" class="mt-3 space-y-3">
+                  <div
+                    v-for="inputSchema in getStepComponentInputs(step)"
+                    :key="inputSchema.id"
+                    class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-3"
+                  >
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="text-xs font-medium text-slate-300">{{ inputSchema.label }}</label>
+                      <span v-if="inputSchema.required" class="text-xs text-red-400">*</span>
+                    </div>
+                    
+                    <div v-if="inputSchema.type === 'string'" class="space-y-2">
+                      <input
+                        v-model="step.inputs[inputSchema.id]"
+                        type="text"
+                        class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                        :placeholder="inputSchema.description || `请输入${inputSchema.label}`"
+                      />
+                      <div class="flex items-center gap-2">
+                        <button
+                          class="text-[11px] text-sky-300 hover:underline"
+                          @click="showVariableSelector(step, inputSchema.id)"
+                        >
+                          🔗 连接数据
+                        </button>
+                        <span class="text-[11px] text-slate-500">或使用变量 {{steps.prev.output}}</span>
+                      </div>
+                    </div>
+                    
+                    <div v-else-if="inputSchema.type === 'number'" class="space-y-2">
+                      <input
+                        v-model.number="step.inputs[inputSchema.id]"
+                        type="number"
+                        class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                        :placeholder="inputSchema.description || `请输入${inputSchema.label}`"
+                      />
+                    </div>
+                    
+                    <div v-else-if="inputSchema.type === 'boolean'" class="space-y-2">
+                      <label class="flex items-center gap-2">
+                        <input
+                          v-model="step.inputs[inputSchema.id]"
+                          type="checkbox"
+                          class="rounded border-slate-700 bg-slate-900 text-sky-500 focus:border-sky-500 focus:ring-sky-500"
+                        />
+                        <span class="text-sm text-slate-300">{{ inputSchema.description || inputSchema.label }}</span>
+                      </label>
+                    </div>
+                    
+                    <div v-else-if="inputSchema.type === 'json'" class="space-y-2">
+                      <textarea
+                        v-model="step.inputs[inputSchema.id]"
+                        rows="3"
+                        class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                        :placeholder="inputSchema.description || `请输入JSON格式的${inputSchema.label}`"
+                      />
+                    </div>
+                    
+                    <div v-else-if="inputSchema.type === 'secret'" class="space-y-2">
+                      <input
+                        v-model="step.inputs[inputSchema.id]"
+                        type="password"
+                        class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                        :placeholder="inputSchema.description || `请输入${inputSchema.label}`"
+                      />
+                      <p class="text-[11px] text-amber-300">⚠️ 敏感信息，请谨慎输入</p>
+                    </div>
+                    
+                    <p v-if="inputSchema.description" class="text-[11px] text-slate-500 mt-1">
+                      {{ inputSchema.description }}
+                    </p>
+                  </div>
+                </div>
+                
+                <!-- 传统输入参数配置（当组件没有定义输入时） -->
+                <div v-else class="mt-3 space-y-2">
                   <div
                     v-for="(input, inputIndex) in step.inputs"
                     :key="input.uid"
@@ -327,7 +391,7 @@
                     </button>
                   </div>
                   <p v-if="!step.inputs.length" class="rounded-lg border border-dashed border-slate-700 bg-slate-900/60 px-3 py-3 text-xs text-slate-500">
-                    暂无输入参数，点击右上角 “添加输入” 维护参数列表。
+                    暂无输入参数，点击右上角 "添加输入" 维护参数列表。
                   </p>
                 </div>
               </div>
@@ -336,68 +400,43 @@
         </div>
       </section>
 
-      <!-- Actions + status -->
-      <aside class="flex h-full flex-col gap-4">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur">
-          <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-300">操作</h2>
-          <div class="mt-4 space-y-3">
-            <button
-              class="w-full rounded-xl bg-sky-500/90 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
-              :disabled="!currentWorkflow || loadingStates.saving"
-              @click="saveCurrentWorkflow"
-            >
-              {{ loadingStates.saving ? '保存中...' : '保存到 GitHub' }}
-            </button>
-            <button
-              class="w-full rounded-xl border border-slate-700 px-4 py-3 text-sm font-medium text-slate-300 transition hover:border-sky-500 hover:text-sky-200 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500"
-              :disabled="!currentWorkflow"
-              @click="triggerManualRun"
-            >
-              手动运行
-            </button>
-            <button
-              class="w-full rounded-xl border border-transparent px-4 py-3 text-sm font-medium text-red-300 transition hover:border-red-500/60 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:text-slate-600"
-              :disabled="!currentWorkflow"
-              @click="confirmDeleteWorkflow"
-            >
-              删除当前工作流
-            </button>
-          </div>
-
-          <div class="mt-6 rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-xs text-slate-400">
-            <p class="font-medium text-slate-300">提示</p>
-            <ul class="mt-2 list-disc space-y-1 pl-4">
-              <li>保存前请确认 Cron 表达式合法。</li>
-              <li>步骤顺序暂不支持拖拽，可通过删除重建调整。</li>
-              <li>“魔法棒”联想将在阶段二上线。</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur">
-          <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-300">状态</h2>
-          <div class="mt-4 space-y-3 text-xs">
-            <div class="flex items-center justify-between">
-              <span class="text-slate-400">选中工作流</span>
-              <span class="font-mono text-slate-200">{{ currentWorkflow?.id || '-' }}</span>
+          <!-- 操作按钮区域 -->
+          <div class="mt-6 flex items-center justify-between border-t border-slate-800 pt-6">
+            <div class="flex items-center gap-3">
+              <button
+                class="rounded-xl bg-sky-500/90 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                :disabled="!currentWorkflow || loadingStates.saving"
+                @click="saveCurrentWorkflow"
+              >
+                {{ loadingStates.saving ? '保存中...' : '保存到 GitHub' }}
+              </button>
+              <button
+                class="rounded-xl border border-slate-700 px-4 py-3 text-sm font-medium text-slate-300 transition hover:border-sky-500 hover:text-sky-200 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500"
+                :disabled="!currentWorkflow"
+                @click="triggerManualRun"
+              >
+                手动运行
+              </button>
+              <button
+                class="rounded-xl border border-transparent px-4 py-3 text-sm font-medium text-red-300 transition hover:border-red-500/60 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:text-slate-600"
+                :disabled="!currentWorkflow"
+                @click="confirmDeleteWorkflow"
+              >
+                删除工作流
+              </button>
             </div>
-            <div class="flex items-center justify-between">
-              <span class="text-slate-400">未保存变更</span>
+            
+            <div class="flex items-center gap-4 text-xs text-slate-400">
+              <span>工作流: {{ currentWorkflow?.id || '-' }}</span>
               <span :class="hasUnsavedChanges ? 'text-amber-300' : 'text-slate-500'">
-                {{ hasUnsavedChanges ? '是' : '否' }}
+                未保存: {{ hasUnsavedChanges ? '是' : '否' }}
               </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-slate-400">脚本数量</span>
-              <span class="text-slate-200">{{ scripts.length }}</span>
             </div>
           </div>
 
           <div v-if="statusMessage.text" :class="statusClasses" class="mt-4 rounded-xl border px-4 py-3 text-xs">
             <p class="font-medium">{{ statusMessage.text }}</p>
           </div>
-        </div>
-      </aside>
         </div>
       </template>
 
@@ -455,13 +494,13 @@
                   </div>
                 </template>
                 <template v-else>
-                  <!-- 系统组件区域 -->
+                  <!-- 本地组件区域 -->
                   <div class="mb-4">
                     <button
                       class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-300 hover:bg-slate-800/40"
                       @click="toggleSystemComponents"
                     >
-                      <span>系统组件</span>
+                      <span>本地组件</span>
                       <svg
                         class="h-4 w-4 transition-transform"
                         :class="showSystemComponents ? 'rotate-90' : ''"
@@ -475,15 +514,15 @@
                     <div v-if="showSystemComponents" class="ml-4 space-y-1">
                       <button
                         v-for="component in systemComponents"
-                        :key="`system-${component.name}`"
+                        :key="`local-${component.name}`"
                         class="group flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition"
-                        :class="selectedComponentId === `system-${component.name}` ? 'bg-sky-500/10 border border-sky-500/40' : 'border border-transparent hover:border-slate-700 hover:bg-slate-800/40'"
-                        @click="selectComponent(`system-${component.name}`, component)"
+                        :class="selectedComponentId === `local-${component.name}` ? 'bg-sky-500/10 border border-sky-500/40' : 'border border-transparent hover:border-slate-700 hover:bg-slate-800/40'"
+                        @click="selectComponent(`local-${component.name}`, component)"
                       >
                         <span class="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-blue-400"></span>
                         <div class="min-w-0">
                           <p class="truncate text-sm font-medium text-slate-100">{{ component.displayName || component.name }}</p>
-                          <p class="mt-1 line-clamp-1 text-xs text-slate-400">{{ component.description || '系统组件' }}</p>
+                          <p class="mt-1 line-clamp-1 text-xs text-slate-400">{{ component.description || '本地组件' }}</p>
                         </div>
                       </button>
                     </div>
@@ -715,6 +754,173 @@
         </div>
       </template>
 
+      <!-- 容器管理页面 -->
+      <template v-else-if="activeTab === 'containers'">
+        <div class="space-y-6">
+          <!-- 容器服务状态 -->
+          <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h2 class="text-lg font-semibold text-slate-100">容器服务状态</h2>
+                <p class="text-sm text-slate-400 mt-1">检查Docker/Podman服务可用性</p>
+              </div>
+              <button
+                class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/10"
+                @click="checkContainerServiceStatus"
+              >
+                检查状态
+              </button>
+            </div>
+
+            <div v-if="containerServiceLoading" class="flex items-center justify-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+              <span class="ml-2 text-sm text-slate-400">检查服务状态中...</span>
+            </div>
+
+            <div v-else-if="containerServiceStatus" class="space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="h-3 w-3 rounded-full" :class="containerServiceStatus.available ? 'bg-emerald-400' : 'bg-red-400'"></div>
+                <span class="text-sm font-medium text-slate-200">
+                  {{ containerServiceStatus.available ? '服务可用' : '服务不可用' }}
+                </span>
+              </div>
+              
+              <div v-if="containerServiceStatus.driver" class="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+                <h4 class="text-sm font-medium text-slate-300 mb-2">驱动信息</h4>
+                <p class="text-xs text-slate-400">类型: {{ containerServiceStatus.driver.driver }}</p>
+                <p class="text-xs text-slate-400">版本: {{ containerServiceStatus.driver.version }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 容器列表 -->
+          <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h2 class="text-lg font-semibold text-slate-100">容器列表</h2>
+                <p class="text-sm text-slate-400 mt-1">管理本地Docker/Podman容器</p>
+              </div>
+              <button
+                class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/10"
+                @click="refreshContainers"
+              >
+                刷新列表
+              </button>
+            </div>
+
+            <div v-if="containersLoading" class="flex items-center justify-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+              <span class="ml-2 text-sm text-slate-400">加载容器列表中...</span>
+            </div>
+
+            <div v-else-if="containers.length === 0" class="text-center py-8">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
+                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              <h3 class="mt-4 text-lg font-medium text-slate-300">暂无容器</h3>
+              <p class="mt-2 text-slate-500">没有找到任何容器</p>
+            </div>
+
+            <div v-else class="space-y-4">
+              <div
+                v-for="container in containers"
+                :key="container.id"
+                class="rounded-lg border border-slate-700 bg-slate-800/40 p-4"
+              >
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                      <h4 class="text-sm font-medium text-slate-100">{{ container.name || container.id }}</h4>
+                      <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                        :class="getContainerStatusClass(container.status)">
+                        {{ getContainerStatus(container.status) }}
+                      </span>
+                    </div>
+                    <p class="text-xs text-slate-400 mb-1">镜像: {{ container.image }}</p>
+                    <p class="text-xs text-slate-500">创建时间: {{ formatDate(container.created) }}</p>
+                    <div v-if="container.ports && container.ports.length" class="mt-2">
+                      <p class="text-xs text-slate-500">端口: {{ container.ports.join(', ') }}</p>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-center gap-2">
+                    <button
+                      v-if="getContainerStatus(container.status) === '已停止'"
+                      class="rounded border border-emerald-500/40 px-2 py-1 text-xs text-emerald-300 transition hover:bg-emerald-500/10"
+                      @click="startContainer(container.id)"
+                    >
+                      启动
+                    </button>
+                    <button
+                      v-else
+                      class="rounded border border-amber-500/40 px-2 py-1 text-xs text-amber-300 transition hover:bg-amber-500/10"
+                      @click="stopContainer(container.id)"
+                    >
+                      停止
+                    </button>
+                    <button
+                      class="rounded border border-sky-500/40 px-2 py-1 text-xs text-sky-300 transition hover:bg-sky-500/10"
+                      @click="viewContainerLogs(container.id)"
+                    >
+                      日志
+                    </button>
+                    <button
+                      class="rounded border border-red-500/40 px-2 py-1 text-xs text-red-300 transition hover:bg-red-500/10"
+                      @click="removeContainer(container.id)"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 容器备份管理 -->
+          <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h2 class="text-lg font-semibold text-slate-100">容器备份管理</h2>
+                <p class="text-sm text-slate-400 mt-1">为容器创建定时备份工作流</p>
+              </div>
+              <button
+                class="rounded-lg border border-emerald-500 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10"
+                @click="showBackupDialog = true"
+              >
+                创建自动备份
+              </button>
+            </div>
+
+            <div class="text-sm text-slate-400 mb-4">
+              支持数据卷和配置备份，可设置定时任务自动执行
+            </div>
+
+            <!-- 备份工作流列表 -->
+            <div v-if="backupWorkflows.length > 0" class="space-y-3">
+              <h4 class="text-sm font-medium text-slate-300">现有备份工作流</h4>
+              <div
+                v-for="workflow in backupWorkflows"
+                :key="workflow.id"
+                class="rounded-lg border border-slate-700 bg-slate-800/40 p-3"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-slate-200">{{ workflow.name }}</p>
+                    <p class="text-xs text-slate-400">Cron: {{ workflow.metadata?.cronExpression }}</p>
+                  </div>
+                  <button
+                    class="rounded border border-red-500/40 px-2 py-1 text-xs text-red-300 transition hover:bg-red-500/10"
+                    @click="deleteBackupWorkflow(workflow.id)"
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
       <!-- 设置页面 -->
       <template v-else-if="activeTab === 'settings'">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur">
@@ -722,6 +928,213 @@
         </div>
       </template>
     </main>
+
+    <!-- 备份创建对话框 -->
+    <div v-if="showBackupDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-slate-100">创建容器自动备份</h3>
+          <p class="text-sm text-slate-400 mt-1">为选中的容器创建定时备份工作流</p>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="text-sm font-medium text-slate-300">选择容器</label>
+            <select
+              v-model="backupForm.containerId"
+              class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+            >
+              <option value="">请选择容器</option>
+              <option v-for="container in containers" :key="container.id" :value="container.id">
+                {{ container.name || container.id }} ({{ getContainerStatus(container.status) }})
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-300">备份频率 (Cron表达式)</label>
+            <div class="mt-1 flex items-center gap-2">
+              <input
+                v-model="backupForm.cronExpression"
+                type="text"
+                class="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                placeholder="0 2 * * * (每天凌晨2点)"
+              />
+              <button
+                class="rounded-lg border border-emerald-500 px-3 py-2 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/10"
+                @click="showCronHelper = true"
+              >
+                AI助手
+              </button>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">使用AI助手生成Cron表达式，或手动输入</p>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-300">备份路径</label>
+            <input
+              v-model="backupForm.backupPath"
+              type="text"
+              class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+              placeholder="/tmp/backups"
+            />
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-slate-300">包含数据卷</p>
+                <p class="text-xs text-slate-500">备份容器的数据卷内容</p>
+              </div>
+              <label class="relative inline-flex cursor-pointer items-center">
+                <input type="checkbox" class="peer sr-only" v-model="backupForm.includeVolumes" />
+                <div class="peer h-6 w-11 rounded-full bg-slate-700 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-500 peer-checked:after:translate-x-5"></div>
+              </label>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-slate-300">包含配置</p>
+                <p class="text-xs text-slate-500">备份容器的配置信息</p>
+              </div>
+              <label class="relative inline-flex cursor-pointer items-center">
+                <input type="checkbox" class="peer sr-only" v-model="backupForm.includeConfig" />
+                <div class="peer h-6 w-11 rounded-full bg-slate-700 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-500 peer-checked:after:translate-x-5"></div>
+              </label>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-slate-300">压缩备份</p>
+                <p class="text-xs text-slate-500">将备份文件压缩为tar.gz格式</p>
+              </div>
+              <label class="relative inline-flex cursor-pointer items-center">
+                <input type="checkbox" class="peer sr-only" v-model="backupForm.compress" />
+                <div class="peer h-6 w-11 rounded-full bg-slate-700 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-500 peer-checked:after:translate-x-5"></div>
+              </label>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-slate-300">上传到飞书</p>
+                <p class="text-xs text-slate-500">备份完成后自动上传到飞书云盘</p>
+              </div>
+              <label class="relative inline-flex cursor-pointer items-center">
+                <input type="checkbox" class="peer sr-only" v-model="backupForm.uploadToFeishu" />
+                <div class="peer h-6 w-11 rounded-full bg-slate-700 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-emerald-500 peer-checked:after:translate-x-5"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-3">
+          <button
+            class="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
+            @click="showBackupDialog = false"
+          >
+            取消
+          </button>
+          <button
+            class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+            @click="createBackupWorkflow"
+            :disabled="!backupForm.containerId"
+          >
+            创建备份工作流
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cron助手对话框 -->
+    <div v-if="showCronHelper" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div class="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-slate-100">AI Cron表达式助手</h3>
+          <p class="text-sm text-slate-400 mt-1">用自然语言描述你的定时需求，AI会帮你生成Cron表达式</p>
+        </div>
+
+        <div class="space-y-4">
+          <!-- 输入区域 -->
+          <div>
+            <label class="text-sm font-medium text-slate-300">描述你的定时需求</label>
+            <div class="mt-1 flex items-center gap-2">
+              <input
+                v-model="cronHelperInput"
+                type="text"
+                class="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+                placeholder="例如：每天凌晨2点、每周一上午9点、每2小时"
+                @keyup.enter="generateCronExpression"
+              />
+              <button
+                class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+                @click="generateCronExpression"
+                :disabled="!cronHelperInput.trim()"
+              >
+                生成
+              </button>
+            </div>
+          </div>
+
+          <!-- 生成结果 -->
+          <div v-if="cronHelperResult" class="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-medium text-slate-200">生成结果</h4>
+              <span class="text-xs text-slate-400">置信度: {{ Math.round(cronHelperResult.confidence * 100) }}%</span>
+            </div>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-400">Cron表达式:</span>
+                <code class="rounded bg-slate-700 px-2 py-1 text-xs text-emerald-300">{{ cronHelperResult.cron }}</code>
+                <button
+                  class="rounded border border-slate-600 px-2 py-1 text-xs text-slate-300 transition hover:bg-slate-700"
+                  @click="copyCronExpression(cronHelperResult.cron)"
+                >
+                  复制
+                </button>
+              </div>
+              <p class="text-xs text-slate-300">{{ cronHelperResult.explanation }}</p>
+            </div>
+          </div>
+
+          <!-- 常用建议 -->
+          <div>
+            <h4 class="text-sm font-medium text-slate-300 mb-3">常用建议</h4>
+            <div class="grid grid-cols-1 gap-2">
+              <button
+                v-for="suggestion in cronSuggestions"
+                :key="suggestion.cron"
+                class="rounded-lg border border-slate-700 bg-slate-800/40 p-3 text-left transition hover:bg-slate-800/60"
+                @click="selectCronSuggestion(suggestion)"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-slate-200">{{ suggestion.description }}</p>
+                    <p class="text-xs text-slate-400">{{ suggestion.explanation }}</p>
+                  </div>
+                  <code class="rounded bg-slate-700 px-2 py-1 text-xs text-emerald-300">{{ suggestion.cron }}</code>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-3">
+          <button
+            class="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
+            @click="showCronHelper = false"
+          >
+            关闭
+          </button>
+          <button
+            v-if="cronHelperResult"
+            class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700"
+            @click="applyCronExpression"
+          >
+            应用表达式
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -767,6 +1180,31 @@ const feishuFiles = ref([]);
 const feishuFilesLoading = ref(false);
 const backupPlans = ref([]);
 const backupPlansLoading = ref(false);
+
+// 容器管理相关状态
+const containerServiceStatus = ref(null);
+const containerServiceLoading = ref(false);
+const containers = ref([]);
+const containersLoading = ref(false);
+
+// 容器备份相关状态
+const showBackupDialog = ref(false);
+const backupWorkflows = ref([]);
+const backupForm = reactive({
+  containerId: '',
+  cronExpression: '0 2 * * *',
+  backupPath: '/tmp/backups',
+  includeVolumes: true,
+  includeConfig: true,
+  compress: true,
+  uploadToFeishu: false
+});
+
+// AI Cron助手相关状态
+const showCronHelper = ref(false);
+const cronHelperInput = ref('');
+const cronHelperResult = ref(null);
+const cronSuggestions = ref([]);
 
 const statusClasses = computed(() => {
   if (statusMessage.type === 'error') {
@@ -832,8 +1270,8 @@ function normalizeWorkflow(raw) {
       uid: createUid(step.id || `step-${index + 1}`),
       id: step.id || `step-${index + 1}`,
       name: step.name || '',
-      script: step.script || '',
-      inputs: Object.entries(step.inputs || {}).map(([key, value]) => createInput(key, typeof value === 'string' ? value : JSON.stringify(value)))
+      component: step.component || '',
+      inputs: step.inputs || {}
     })),
   };
 }
@@ -852,13 +1290,8 @@ function denormalizeWorkflow(workflow) {
     steps: workflow.steps.map((step, index) => ({
       id: step.id || `step-${index + 1}`,
       name: step.name,
-      script: step.script,
-      inputs: step.inputs.reduce((acc, input) => {
-        if (input.key) {
-          acc[input.key] = input.value ?? '';
-        }
-        return acc;
-      }, {}),
+      component: step.component,
+      inputs: step.inputs || {},
     })),
   };
 }
@@ -905,10 +1338,10 @@ async function selectWorkflow(id) {
       throw new Error('工作流数据不完整');
     }
     const normalized = normalizeWorkflow(data);
-    // 确保每个步骤至少有一个输入占位
+    // 确保每个步骤都有输入对象
     normalized.steps.forEach((step) => {
-      if (!step.inputs.length) {
-        step.inputs.push(createInput());
+      if (!step.inputs || typeof step.inputs !== 'object') {
+        step.inputs = {};
       }
     });
     currentWorkflow.value = normalized;
@@ -931,8 +1364,8 @@ function addStep() {
     uid: createUid('step'),
     id: nextId,
     name: '',
-    script: '',
-    inputs: [createInput()],
+    component: '',
+    inputs: {},
   };
   currentWorkflow.value.steps.push(step);
 }
@@ -955,9 +1388,38 @@ function removeInput(step, inputIndex) {
   step.inputs.splice(inputIndex, 1);
 }
 
-function selectedScriptPath(scriptName) {
-  const script = scripts.value.find((item) => item.name === scriptName);
-  return script?.path || '未选择脚本';
+function getStepComponentType(componentValue) {
+  if (!componentValue) return '未选择组件';
+  const [type] = componentValue.split(':');
+  return type === 'local' ? '本地组件' : '用户组件';
+}
+
+function getStepComponentInputs(step) {
+  if (!step.component) return [];
+  
+  const [type, name] = step.component.split(':');
+  const components = type === 'local' ? systemComponents.value : userComponents.value;
+  const component = components.find(c => c.name === name);
+  
+  return component?.inputs || [];
+}
+
+function onStepComponentChange(step) {
+  // 当组件改变时，清空输入参数并重新初始化
+  step.inputs = {};
+  
+  // 如果有组件清单定义的输入，初始化默认值
+  const inputs = getStepComponentInputs(step);
+  inputs.forEach(input => {
+    if (input.default !== undefined) {
+      step.inputs[input.id] = input.default;
+    }
+  });
+}
+
+function showVariableSelector(step, inputId) {
+  // TODO: 实现变量选择器弹窗
+  setStatus('info', '变量选择器功能开发中...');
 }
 
 async function handleCreateWorkflow() {
@@ -1362,6 +1824,353 @@ function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+// 容器管理相关方法
+async function checkContainerServiceStatus() {
+  containerServiceLoading.value = true;
+  try {
+    const res = await fetch('/api/containers/status');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        containerServiceStatus.value = data.data;
+        setStatus('success', '容器服务状态检查完成');
+      } else {
+        setStatus('error', data.error || '检查容器服务状态失败');
+      }
+    } else {
+      setStatus('error', '检查容器服务状态失败');
+    }
+  } catch (err) {
+    console.error('检查容器服务状态失败:', err);
+    setStatus('error', '检查容器服务状态失败');
+  } finally {
+    containerServiceLoading.value = false;
+  }
+}
+
+async function refreshContainers() {
+  containersLoading.value = true;
+  try {
+    const res = await fetch('/api/containers');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        containers.value = data.data || [];
+        setStatus('success', '容器列表刷新成功');
+      } else {
+        setStatus('error', data.error || '获取容器列表失败');
+      }
+    } else {
+      setStatus('error', '获取容器列表失败');
+    }
+  } catch (err) {
+    console.error('获取容器列表失败:', err);
+    setStatus('error', '获取容器列表失败');
+  } finally {
+    containersLoading.value = false;
+  }
+}
+
+async function startContainer(containerId) {
+  try {
+    const res = await fetch(`/api/containers/${containerId}/start`, {
+      method: 'POST'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        setStatus('success', `容器 ${containerId} 启动成功`);
+        await refreshContainers();
+      } else {
+        setStatus('error', data.error || '启动容器失败');
+      }
+    } else {
+      setStatus('error', '启动容器失败');
+    }
+  } catch (err) {
+    console.error('启动容器失败:', err);
+    setStatus('error', '启动容器失败');
+  }
+}
+
+async function stopContainer(containerId) {
+  try {
+    const res = await fetch(`/api/containers/${containerId}/stop`, {
+      method: 'POST'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        setStatus('success', `容器 ${containerId} 停止成功`);
+        await refreshContainers();
+      } else {
+        setStatus('error', data.error || '停止容器失败');
+      }
+    } else {
+      setStatus('error', '停止容器失败');
+    }
+  } catch (err) {
+    console.error('停止容器失败:', err);
+    setStatus('error', '停止容器失败');
+  }
+}
+
+async function removeContainer(containerId) {
+  if (!confirm(`确定要删除容器 ${containerId} 吗？`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/containers/${containerId}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        setStatus('success', `容器 ${containerId} 删除成功`);
+        await refreshContainers();
+      } else {
+        setStatus('error', data.error || '删除容器失败');
+      }
+    } else {
+      setStatus('error', '删除容器失败');
+    }
+  } catch (err) {
+    console.error('删除容器失败:', err);
+    setStatus('error', '删除容器失败');
+  }
+}
+
+async function viewContainerLogs(containerId) {
+  try {
+    const res = await fetch(`/api/containers/${containerId}/logs?lines=100`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        // 在新窗口中显示日志
+        const logsWindow = window.open('', '_blank', 'width=800,height=600');
+        logsWindow.document.write(`
+          <html>
+            <head>
+              <title>容器日志 - ${containerId}</title>
+              <style>
+                body { font-family: monospace; background: #1e293b; color: #e2e8f0; padding: 20px; }
+                pre { white-space: pre-wrap; word-wrap: break-word; }
+              </style>
+            </head>
+            <body>
+              <h2>容器日志: ${containerId}</h2>
+              <pre>${data.data.logs || '暂无日志'}</pre>
+            </body>
+          </html>
+        `);
+      } else {
+        setStatus('error', data.error || '获取容器日志失败');
+      }
+    } else {
+      setStatus('error', '获取容器日志失败');
+    }
+  } catch (err) {
+    console.error('获取容器日志失败:', err);
+    setStatus('error', '获取容器日志失败');
+  }
+}
+
+function getContainerStatus(status) {
+  if (!status) return '未知';
+  if (status.includes('Up') || status.includes('running')) return '运行中';
+  if (status.includes('Exited') || status.includes('stopped')) return '已停止';
+  return status;
+}
+
+function getContainerStatusClass(status) {
+  const statusText = getContainerStatus(status);
+  switch (statusText) {
+    case '运行中':
+      return 'bg-emerald-500/20 text-emerald-300';
+    case '已停止':
+      return 'bg-red-500/20 text-red-300';
+    default:
+      return 'bg-slate-500/20 text-slate-300';
+  }
+}
+
+function formatDate(dateString) {
+  if (!dateString) return '未知';
+  try {
+    return new Date(dateString).toLocaleString('zh-CN');
+  } catch (err) {
+    return dateString;
+  }
+}
+
+// 容器备份相关方法
+async function createBackupWorkflow() {
+  if (!backupForm.containerId) {
+    setStatus('error', '请选择要备份的容器');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/container-backup/workflows', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(backupForm)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        setStatus('success', '容器备份工作流创建成功');
+        showBackupDialog.value = false;
+        await loadBackupWorkflows();
+        // 重置表单
+        Object.assign(backupForm, {
+          containerId: '',
+          cronExpression: '0 2 * * *',
+          backupPath: '/tmp/backups',
+          includeVolumes: true,
+          includeConfig: true,
+          compress: true,
+          uploadToFeishu: false
+        });
+      } else {
+        setStatus('error', data.error || '创建备份工作流失败');
+      }
+    } else {
+      setStatus('error', '创建备份工作流失败');
+    }
+  } catch (err) {
+    console.error('创建备份工作流失败:', err);
+    setStatus('error', '创建备份工作流失败');
+  }
+}
+
+async function loadBackupWorkflows() {
+  try {
+    // 获取所有工作流，然后过滤出备份工作流
+    const res = await fetch('/api/workflows');
+    if (res.ok) {
+      const data = await res.json();
+      backupWorkflows.value = data.workflows.filter(workflow => 
+        workflow.metadata?.createdBy === 'container-backup-service'
+      );
+    }
+  } catch (err) {
+    console.error('加载备份工作流失败:', err);
+  }
+}
+
+async function deleteBackupWorkflow(workflowId) {
+  if (!confirm('确定要删除这个备份工作流吗？')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/container-backup/workflows/${workflowId}`, {
+      method: 'DELETE'
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        setStatus('success', '备份工作流删除成功');
+        await loadBackupWorkflows();
+      } else {
+        setStatus('error', data.error || '删除备份工作流失败');
+      }
+    } else {
+      setStatus('error', '删除备份工作流失败');
+    }
+  } catch (err) {
+    console.error('删除备份工作流失败:', err);
+    setStatus('error', '删除备份工作流失败');
+  }
+}
+
+// AI Cron助手相关方法
+async function generateCronExpression() {
+  if (!cronHelperInput.value.trim()) {
+    setStatus('error', '请输入定时需求描述');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/ai-cron/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        description: cronHelperInput.value
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        cronHelperResult.value = data.data;
+        setStatus('success', 'Cron表达式生成成功');
+      } else {
+        setStatus('error', data.error || '生成Cron表达式失败');
+      }
+    } else {
+      setStatus('error', '生成Cron表达式失败');
+    }
+  } catch (err) {
+    console.error('生成Cron表达式失败:', err);
+    setStatus('error', '生成Cron表达式失败');
+  }
+}
+
+async function loadCronSuggestions() {
+  try {
+    const res = await fetch('/api/ai-cron/suggestions');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        cronSuggestions.value = data.data;
+      }
+    }
+  } catch (err) {
+    console.error('加载Cron建议失败:', err);
+  }
+}
+
+function selectCronSuggestion(suggestion) {
+  cronHelperResult.value = {
+    cron: suggestion.cron,
+    explanation: suggestion.explanation,
+    confidence: 0.9
+  };
+}
+
+function applyCronExpression() {
+  if (cronHelperResult.value) {
+    // 如果当前在工作流编辑页面
+    if (currentWorkflow.value && currentWorkflow.value.trigger.type === 'cron') {
+      currentWorkflow.value.trigger.cronExpression = cronHelperResult.value.cron;
+    }
+    // 如果当前在备份对话框
+    if (showBackupDialog.value) {
+      backupForm.cronExpression = cronHelperResult.value.cron;
+    }
+    
+    setStatus('success', 'Cron表达式已应用');
+    showCronHelper.value = false;
+  }
+}
+
+function copyCronExpression(cron) {
+  navigator.clipboard.writeText(cron).then(() => {
+    setStatus('success', 'Cron表达式已复制到剪贴板');
+  }).catch(() => {
+    setStatus('error', '复制失败');
+  });
+}
+
 function toggleSystemComponents() {
   showSystemComponents.value = !showSystemComponents.value;
 }
@@ -1373,7 +2182,7 @@ function toggleUserComponents() {
 function selectComponent(componentId, component) {
   selectedComponentId.value = componentId;
   currentComponent.value = component;
-  currentComponentType.value = componentId.startsWith('system-') ? 'official' : 'user';
+  currentComponentType.value = componentId.startsWith('local-') ? 'local' : 'user';
 }
 
 async function handleCreateComponent() {
@@ -1453,6 +2262,8 @@ onMounted(() => {
   fetchComponents();
   checkFeishuAuthStatus();
   refreshBackupPlans();
+  loadBackupWorkflows();
+  loadCronSuggestions();
 });
 </script>
 

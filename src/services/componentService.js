@@ -1,8 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import pkg from 'isolated-vm';
-const { Isolate } = pkg;
+import { fork } from 'child_process';
 import GitFS from '../core/gitfs.js';
 import { getConfig } from './configService.js';
 import { info, success, error, warning } from '../utils/logger.js';
@@ -33,14 +32,14 @@ class ComponentService {
     info('Initializing component system...');
     
     try {
-      // 加载官方组件
-      await this.loadOfficialComponents();
+      // 加载本地组件
+      await this.loadLocalComponents();
       
       // 加载用户组件
       await this.loadUserComponents();
       
       this.loaded = true;
-      success(`Component system initialized successfully. Loaded ${this.officialComponents.size} official components and ${this.userComponents.size} user components.`);
+      success(`Component system initialized successfully. Loaded ${this.officialComponents.size} local components and ${this.userComponents.size} user components.`);
     } catch (err) {
       error(`Failed to initialize component system: ${err.message}`);
       throw err;
@@ -48,10 +47,10 @@ class ComponentService {
   }
 
   /**
-   * 获取官方组件目录
+   * 获取本地组件目录
    */
-  getOfficialComponentsDir() {
-    return path.resolve(__dirname, '../../components/official');
+  getLocalComponentsDir() {
+    return path.resolve(__dirname, '../../components');
   }
 
   /**
@@ -62,27 +61,27 @@ class ComponentService {
   }
 
   /**
-   * 加载官方组件
+   * 加载本地组件
    */
-  async loadOfficialComponents() {
-    const officialDir = this.getOfficialComponentsDir();
+  async loadLocalComponents() {
+    const localDir = this.getLocalComponentsDir();
     
-    // 如果官方组件目录不存在，创建它
-    if (!fs.existsSync(officialDir)) {
-      fs.mkdirSync(officialDir, { recursive: true });
-      info(`Created official components directory: ${officialDir}`);
+    // 如果本地组件目录不存在，创建它
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+      info(`Created local components directory: ${localDir}`);
       return;
     }
 
     try {
-      // 读取官方组件目录
-      const components = this.readComponentDirectories(officialDir);
+      // 读取本地组件目录
+      const components = this.readComponentDirectories(localDir);
       
       for (const component of components) {
-        await this.loadComponent(component, true);
+        await this.loadComponent(component, 'local');
       }
     } catch (err) {
-      error(`Failed to load official components: ${err.message}`);
+      error(`Failed to load local components: ${err.message}`);
     }
   }
 
@@ -187,7 +186,7 @@ class ComponentService {
   /**
    * 加载本地组件
    */
-  async loadComponent(componentPath, isOfficial = false) {
+  async loadComponent(componentPath, componentType = 'local') {
     try {
       const componentName = path.basename(componentPath);
       
@@ -219,14 +218,14 @@ class ComponentService {
       }
 
       // 缓存组件代码
-      const componentKey = isOfficial ? `official:${componentName}` : `local:${componentName}`;
+      const componentKey = `${componentType}:${componentName}`;
       this.componentCache.set(componentKey, {
         manifest,
         code: codeContent
       });
 
       // 存储组件信息
-      const componentsMap = isOfficial ? this.officialComponents : this.userComponents;
+      const componentsMap = componentType === 'local' ? this.officialComponents : this.userComponents;
       componentsMap.set(componentName, {
         name: componentName,
         displayName: manifest.displayName || componentName,
@@ -234,10 +233,10 @@ class ComponentService {
         version: manifest.version || '1.0.0',
         inputs: manifest.inputs || [],
         outputs: manifest.outputs || [],
-        type: isOfficial ? 'official' : 'local'
+        type: componentType
       });
 
-      info(`Loaded ${isOfficial ? 'official' : 'local'} component: ${componentName}`);
+      info(`Loaded ${componentType} component: ${componentName}`);
     } catch (err) {
       error(`Failed to load component ${path.basename(componentPath)}: ${err.message}`);
     }
@@ -332,83 +331,157 @@ class ComponentService {
   }
 
   /**
-   * 执行组件代码
+   * 执行组件代码 - 使用子进程模型
    */
   async executeComponentCode(code, context) {
-    try {
-      // 创建isolated-vm隔离环境
-      const isolate = new Isolate({ memoryLimit: 128 });
-      const context_vm = await isolate.createContext();
-      
-      // 设置全局对象
-      const jail = context_vm.global;
-      await jail.set('global', jail.derefInto());
-      
-      // 创建安全的context对象
-      const contextObj = await context_vm.eval(`({
-        inputs: ${JSON.stringify(context.inputs || {})},
-        outputs: {},
-        context: ${JSON.stringify(context.context || {})},
-        log: {
-          info: (msg) => console.log('[INFO]', msg),
-          error: (msg) => console.error('[ERROR]', msg),
-          success: (msg) => console.log('[SUCCESS]', msg)
+    return new Promise((resolve, reject) => {
+      try {
+        // 创建临时文件来存储组件代码
+        const tempDir = path.join(__dirname, '../../temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
         }
-      })`);
-      
-      // 将context对象注入到隔离环境
-      await jail.set('context', contextObj);
-      
-      // 处理ES Module语法和ES6语法兼容性
-      let processedCode = code;
-      
-      // 将ES6语法转换为ES5兼容语法
-      processedCode = processedCode
-        .replace(/\bconst\b/g, 'var')
-        .replace(/\blet\b/g, 'var')
-        .replace(/=>/g, 'function() { return ')
-        .replace(/async\s+function/g, 'function')
-        .replace(/await\s+/g, '');
-      
-      if (processedCode.includes('export default')) {
-        // 将export default function转换为普通函数
-        processedCode = processedCode.replace(
-          /export\s+default\s+function\s*\([^)]*\)\s*{/,
-          'function componentFunction('
-        );
         
-        // 如果还有export default，替换为return
-        processedCode = processedCode.replace(/export\s+default\s+/, 'return ');
+        const tempFile = path.join(tempDir, `component-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.js`);
         
-        // 在代码末尾添加函数调用
-        processedCode += '\n\n// 执行组件函数\nvar result = componentFunction(context);\nresult;';
-      } else {
-        // 如果不是ES Module，直接执行
-        processedCode += '\n\n// 执行组件代码\nresult;';
-      }
-      
-      // 在隔离环境中执行代码
-      const result = await context_vm.eval(processedCode, { timeout: 30000 });
-      
-      // 获取执行后的outputs
-      const outputs = await contextObj.get('outputs');
-      const outputsObj = await outputs.get();
-      
-      // 合并返回结果
-      const finalResult = {
-        ...outputsObj,
-        ...(result || {})
-      };
-      
-      // 清理隔离环境
-      context_vm.release();
-      isolate.dispose();
-      
-      return finalResult;
-    } catch (err) {
-      error(`Component execution error: ${err.message}`);
-      throw err;
+        // 创建组件执行器代码
+        const executorCode = `
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// 组件代码
+${code}
+
+// 执行组件
+async function executeComponent() {
+  try {
+    const context = ${JSON.stringify(context)};
+    
+    // 创建日志函数
+    const log = {
+      info: (msg) => console.log('[INFO]', msg),
+      error: (msg) => console.error('[ERROR]', msg),
+      success: (msg) => console.log('[SUCCESS]', msg),
+      warning: (msg) => console.warn('[WARNING]', msg)
+    };
+    
+    // 创建输出对象
+    const outputs = {};
+    
+    // 创建执行上下文
+    const execContext = {
+      inputs: context.inputs || {},
+      outputs: outputs,
+      context: context.context || {},
+      log: log
+    };
+    
+    let result;
+    
+    // 检查是否是ES Module格式
+    if (typeof componentFunction === 'function') {
+      result = await componentFunction(execContext);
+    } else {
+      // 如果不是函数，直接执行代码
+      result = await eval(\`(async function() { \${componentCode} })()\`);
     }
+    
+    // 返回结果
+    process.send({
+      success: true,
+      result: {
+        ...outputs,
+        ...(result || {})
+      }
+    });
+    
+  } catch (err) {
+    process.send({
+      success: false,
+      error: err.message,
+      stack: err.stack
+    });
+  }
+}
+
+// 启动执行
+executeComponent();
+        `;
+        
+        // 写入临时文件
+        fs.writeFileSync(tempFile, executorCode);
+        
+        // 创建子进程
+        const child = fork(tempFile, [], {
+          cwd: path.dirname(tempFile), // 设置工作目录为组件所在目录
+          stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+          timeout: 30000 // 30秒超时
+        });
+        
+        // 设置超时
+        const timeout = setTimeout(() => {
+          child.kill('SIGTERM');
+          reject(new Error('Component execution timed out after 30 seconds'));
+        }, 30000);
+        
+        // 监听子进程消息
+        child.on('message', (message) => {
+          clearTimeout(timeout);
+          child.kill();
+          
+          // 清理临时文件
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (err) {
+            // 忽略清理错误
+          }
+          
+          if (message.success) {
+            resolve(message.result);
+          } else {
+            reject(new Error(message.error || 'Component execution failed'));
+          }
+        });
+        
+        // 监听子进程错误
+        child.on('error', (err) => {
+          clearTimeout(timeout);
+          child.kill();
+          
+          // 清理临时文件
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (cleanupErr) {
+            // 忽略清理错误
+          }
+          
+          reject(err);
+        });
+        
+        // 监听子进程退出
+        child.on('exit', (code, signal) => {
+          clearTimeout(timeout);
+          
+          // 清理临时文件
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (err) {
+            // 忽略清理错误
+          }
+          
+          if (code !== 0 && !signal) {
+            reject(new Error(`Component process exited with code ${code}`));
+          }
+        });
+        
+      } catch (err) {
+        error(`Component execution error: ${err.message}`);
+        reject(err);
+      }
+    });
   }
 
   /**
@@ -417,11 +490,11 @@ class ComponentService {
   async getAllComponents() {
     await this.initialize();
     
-    const officialComponents = Array.from(this.officialComponents.values());
+    const localComponents = Array.from(this.officialComponents.values());
     const userComponents = Array.from(this.userComponents.values());
     
     return {
-      official: officialComponents,
+      local: localComponents,
       user: userComponents
     };
   }
@@ -432,7 +505,7 @@ class ComponentService {
   async getComponent(componentType, componentName) {
     await this.initialize();
     
-    const componentsMap = componentType === 'official' ? this.officialComponents : this.userComponents;
+    const componentsMap = componentType === 'local' ? this.officialComponents : this.userComponents;
     const component = componentsMap.get(componentName);
     
     if (!component) {

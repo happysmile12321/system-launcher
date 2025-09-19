@@ -15,6 +15,9 @@ import componentsRouter from './routes/components.js';
 import triggersRouter from './routes/triggers.js';
 import webhookRouter from './routes/webhook.js';
 import servicesRouter from './routes/services.js';
+import containersRouter from './routes/containers.js';
+import containerBackupRouter, { initializeContainerBackupService } from './routes/containerBackup.js';
+import aiCronRouter from './routes/aiCron.js';
 import {
   listWorkflows,
   getWorkflow as getWorkflowById,
@@ -350,6 +353,15 @@ app.use('/api/webhook', webhookRouter);
 // System Services API Route
 app.use('/api/services', servicesRouter);
 
+// Container Management API Route
+app.use('/api/containers', containersRouter);
+
+// Container Backup API Route
+app.use('/api/container-backup', containerBackupRouter);
+
+// AI Cron API Route
+app.use('/api/ai-cron', aiCronRouter);
+
 
 // --- Server Startup ---
 async function startServer() {
@@ -381,6 +393,22 @@ async function startServer() {
     await startScheduler();
   } catch (schedulerError) {
     warning(`定时任务服务启动失败: ${schedulerError.message}`);
+  }
+
+  // 初始化容器备份服务
+  try {
+    const { default: WorkflowService } = await import('../services/workflowService.js');
+    const { default: TriggerService } = await import('../services/triggerService.js');
+    const { default: ComponentService } = await import('../services/componentService.js');
+    
+    const workflowService = new WorkflowService();
+    const triggerService = new TriggerService();
+    const componentService = new ComponentService();
+    
+    initializeContainerBackupService(workflowService, triggerService, componentService);
+    info('容器备份服务初始化完成');
+  } catch (backupServiceError) {
+    warning(`容器备份服务初始化失败: ${backupServiceError.message}`);
   }
     } catch (e) {
       warning(`Failed to initialize GitHub directories: ${e.message}`);

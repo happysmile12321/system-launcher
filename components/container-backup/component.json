@@ -1,0 +1,46 @@
+{
+  "name": "容器数据备份",
+  "description": "备份Docker/Podman容器的数据卷和配置",
+  "version": "1.0.0",
+  "inputs": {
+    "containerId": {
+      "type": "string",
+      "description": "容器ID或名称",
+      "required": true
+    },
+    "backupPath": {
+      "type": "string", 
+      "description": "备份文件保存路径",
+      "default": "/tmp/backups"
+    },
+    "includeVolumes": {
+      "type": "boolean",
+      "description": "是否包含数据卷",
+      "default": true
+    },
+    "includeConfig": {
+      "type": "boolean", 
+      "description": "是否包含容器配置",
+      "default": true
+    },
+    "compress": {
+      "type": "boolean",
+      "description": "是否压缩备份文件",
+      "default": true
+    }
+  },
+  "outputs": {
+    "backupFile": {
+      "type": "string",
+      "description": "备份文件路径"
+    },
+    "backupSize": {
+      "type": "number", 
+      "description": "备份文件大小（字节）"
+    },
+    "containerInfo": {
+      "type": "object",
+      "description": "容器信息"
+    }
+  }
+}
