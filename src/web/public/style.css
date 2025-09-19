@@ -6,6 +6,148 @@ body {
     color: #333;
 }
 
+/* Loading spinner animation */
+.spinner {
+    display: inline-block;
+    margin-left: 5px;
+}
+
+/* Toast notification styles */
+.toast {
+    padding: 12px 16px;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: slideIn 0.3s ease-out;
+    opacity: 0;
+    animation-fill-mode: forwards;
+    z-index: 1000;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.toast-success {
+    background-color: #10b981;
+}
+
+.toast-error {
+    background-color: #ef4444;
+}
+
+.toast-info {
+    background-color: #3b82f6;
+}
+
+/* Logs styling */
+.logs-container {
+    font-family: 'Consolas', 'Monaco', monospace;
+    line-height: 1.5;
+}
+
+.logs-container .log-info {
+    color: #3b82f6;
+}
+
+.logs-container .log-error {
+    color: #ef4444;
+}
+
+.logs-container .log-success {
+    color: #10b981;
+}
+
+.logs-container .log-warning {
+    color: #f59e0b;
+}
+
+/* Monaco Editor wrapper */
+#json-editor-container {
+    position: relative;
+}
+
+/* Status indicators */
+.nav-button.active {
+    background-color: #3b82f6;
+    color: white;
+}
+
+/* Form elements */
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Script editor modal */
+.modal-content {
+    animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Unsaved changes indicator */
+#unsaved-indicator {
+    color: #ef4444;
+    font-weight: bold;
+}
+
+/* Button hover effects */
+button {
+    transition: all 0.2s ease;
+}
+
+button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 16px;
+    }
+    
+    .flex-lg-row {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100% !important;
+        margin-top: 24px;
+    }
+}
+
 /* Hidden Class */
 .hidden {
     display: none !important;
