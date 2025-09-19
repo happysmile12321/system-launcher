@@ -18,6 +18,18 @@ Starts a web server at `http://localhost:3000`.
 npm start
 ```
 
+The redesigned workflow designer is built with Vite. During development you can run the front-end separately:
+
+```bash
+npm run web:dev
+```
+
+Before launching the Express server in production mode, make sure to bundle the UI assets:
+
+```bash
+npm run web:build
+```
+
 ### CLI
 Starts the interactive command-line interface.
 

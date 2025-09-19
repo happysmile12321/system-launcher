@@ -6,6 +6,10 @@ import chalk from 'chalk';
 import { execa } from 'execa';
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // --- 辅助函数 ---
 const log = console.log;

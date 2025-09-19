@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fsPromises from 'fs/promises';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,8 +25,43 @@ export async function loadConfig() {
 }
 
 export async function saveConfig(newConfig) {
-  await fsPromises.writeFile(configPath, JSON.stringify(newConfig, null, 2));
-  config = newConfig;
+  const { githubToken, githubRepoOwner, githubRepoName, configFilePath, feishuAppId, feishuAppSecret } = newConfig;
+
+  const structuredConfig = {
+    github: {
+      token: githubToken,
+      owner: githubRepoOwner,
+      repo: githubRepoName,
+      configFile: configFilePath,
+    },
+    storage: {
+      driver: feishuAppId ? 'feishu' : 'local',
+      feishu: {
+        appId: feishuAppId,
+        appSecret: feishuAppSecret,
+      },
+    },
+    management: {
+      apiKey: crypto.randomBytes(32).toString('hex'),
+    },
+    proxy: {
+      enabled: false,
+      http: '',
+      https: '',
+      noProxy: 'localhost,127.0.0.1',
+    },
+    container: {
+      driver: 'docker',
+      docker: {},
+      podman: {},
+    },
+    scheduler: {
+      cronExpression: '0 0 * * *',
+    },
+  };
+
+  await fsPromises.writeFile(configPath, JSON.stringify(structuredConfig, null, 2));
+  config = structuredConfig;
 }
 
 export function getConfig() {
@@ -33,5 +69,5 @@ export function getConfig() {
 }
 
 export function isConfigured() {
-  return config !== null && config.githubToken;
+  return config !== null && config.github?.token;
 }

@@ -10,7 +10,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/web/server.js",
-    "cli": "node src/cli/index.js"
+    "cli": "node src/cli/index.js",
+    "web:dev": "vite --config src/web/ui/vite.config.js",
+    "web:build": "vite build --config src/web/ui/vite.config.js",
+    "web:preview": "vite preview --config src/web/ui/vite.config.js"
   },
   "keywords": [
     "cli",
@@ -28,6 +31,14 @@
     "inquirer": "^9.2.20",
     "node-fetch": "^3.3.2",
     "node-schedule": "^2.1.1",
-    "octokit": "^3.2.1"
+    "octokit": "^3.2.1",
+    "vue": "^3.4.31"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "vite": "^5.2.11"
   }
 }
