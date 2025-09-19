@@ -62,7 +62,20 @@
             </button>
           </div>
           <div class="max-h-[16rem] overflow-y-auto px-2 py-2 scrollbar-hide">
-            <template v-if="workflows.length">
+            <template v-if="loadingStates.list">
+              <div class="space-y-3">
+                <div v-for="i in 3" :key="i" class="rounded-xl border border-slate-800 bg-slate-900/80 p-3">
+                  <div class="flex items-start gap-3">
+                    <div class="mt-1 h-2 w-2 rounded-full bg-slate-600"></div>
+                    <div class="flex-1 space-y-2">
+                      <SkeletonLoader type="text" width="60%" height="0.875rem" />
+                      <SkeletonLoader type="text" width="40%" height="0.75rem" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-else-if="workflows.length">
               <button
                 v-for="workflow in workflows"
                 :key="workflow.id"
@@ -78,7 +91,7 @@
                 </div>
               </button>
             </template>
-            <p v-else class="px-3 py-6 text-sm text-slate-500">还没有任何工作流，点击右上角的“新建”开始吧。</p>
+            <p v-else class="px-3 py-6 text-sm text-slate-500">还没有任何工作流，点击右上角的"新建"开始吧。</p>
           </div>
         </div>
 
@@ -131,7 +144,7 @@
                 class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 focus:border-sky-500 focus:outline-none"
               >
                 <option value="cron">定时任务 (Cron)</option>
-                <option value="webhook" disabled>Webhook（开发中）</option>
+                <option value="webhook">Webhook</option>
               </select>
             </template>
             <template v-else>
@@ -156,8 +169,43 @@
               <p class="text-xs text-slate-500">稍后我们会引入可视化的 Cron 生成器，这里先手动填写。</p>
             </div>
 
-            <div v-else class="mt-5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-xs text-amber-200">
-              Webhook 配置即将上线，目前仅支持 Cron 触发。
+            <div v-else-if="currentWorkflow.trigger.type === 'webhook'" class="mt-5 space-y-3">
+              <label class="text-xs font-medium text-slate-400">Webhook URL</label>
+              <div class="flex items-center gap-2">
+                <input
+                  :value="`${window.location.origin}/api/webhook/${currentWorkflow.id}`"
+                  type="text"
+                  readonly
+                  class="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-300 focus:border-sky-500 focus:outline-none"
+                />
+                <button
+                  class="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-600"
+                  @click="copyWebhookUrl"
+                >
+                  复制
+                </button>
+              </div>
+              <p class="text-xs text-slate-500">
+                使用此URL作为Webhook端点。支持GET和POST请求，任务将异步执行。
+              </p>
+              
+              <div class="mt-4 rounded-lg border border-slate-700 bg-slate-950/80 p-3">
+                <h4 class="text-xs font-medium text-slate-300 mb-2">测试Webhook</h4>
+                <div class="flex gap-2">
+                  <button
+                    class="rounded-lg border border-slate-700 px-3 py-1 text-xs font-medium text-slate-300 transition hover:bg-slate-600"
+                    @click="testWebhook('GET')"
+                  >
+                    测试 GET
+                  </button>
+                  <button
+                    class="rounded-lg border border-slate-700 px-3 py-1 text-xs font-medium text-slate-300 transition hover:bg-slate-600"
+                    @click="testWebhook('POST')"
+                  >
+                    测试 POST
+                  </button>
+                </div>
+              </div>
             </div>
           </template>
 
@@ -298,7 +346,7 @@
               :disabled="!currentWorkflow"
               @click="triggerManualRun"
             >
-              手动运行（即将推出）
+              手动运行
             </button>
             <button
               class="w-full rounded-xl border border-transparent px-4 py-3 text-sm font-medium text-red-300 transition hover:border-red-500/60 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:text-slate-600"
@@ -362,74 +410,113 @@
                 </button>
               </div>
               <div class="max-h-[20rem] overflow-y-auto px-2 py-2 scrollbar-hide">
-                <!-- 系统组件区域 -->
-                <div class="mb-4">
-                  <button
-                    class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-300 hover:bg-slate-800/40"
-                    @click="toggleSystemComponents"
-                  >
-                    <span>系统组件</span>
-                    <svg
-                      class="h-4 w-4 transition-transform"
-                      :class="showSystemComponents ? 'rotate-90' : ''"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                  </button>
-                  <div v-if="showSystemComponents" class="ml-4 space-y-1">
-                    <button
-                      v-for="component in systemComponents"
-                      :key="`system-${component.name}`"
-                      class="group flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition"
-                      :class="selectedComponentId === `system-${component.name}` ? 'bg-sky-500/10 border border-sky-500/40' : 'border border-transparent hover:border-slate-700 hover:bg-slate-800/40'"
-                      @click="selectComponent(`system-${component.name}`, component)"
-                    >
-                      <span class="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-blue-400"></span>
-                      <div class="min-w-0">
-                        <p class="truncate text-sm font-medium text-slate-100">{{ component.displayName || component.name }}</p>
-                        <p class="mt-1 line-clamp-1 text-xs text-slate-400">{{ component.description || '系统组件' }}</p>
+                <template v-if="loadingStates.components">
+                  <div class="space-y-4">
+                    <!-- 系统组件骨架 -->
+                    <div>
+                      <div class="flex w-full items-center justify-between rounded-lg px-3 py-2">
+                        <SkeletonLoader type="text" width="80px" height="0.875rem" />
+                        <div class="h-4 w-4 rounded bg-slate-600"></div>
                       </div>
-                    </button>
+                      <div class="ml-4 space-y-1">
+                        <div v-for="i in 2" :key="i" class="flex items-start gap-3 rounded-xl px-3 py-2">
+                          <div class="mt-1 h-2 w-2 rounded-full bg-slate-600"></div>
+                          <div class="flex-1 space-y-1">
+                            <SkeletonLoader type="text" width="70%" height="0.875rem" />
+                            <SkeletonLoader type="text" width="50%" height="0.75rem" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- 用户组件骨架 -->
+                    <div>
+                      <div class="flex w-full items-center justify-between rounded-lg px-3 py-2">
+                        <SkeletonLoader type="text" width="80px" height="0.875rem" />
+                        <div class="h-4 w-4 rounded bg-slate-600"></div>
+                      </div>
+                      <div class="ml-4 space-y-1">
+                        <div v-for="i in 2" :key="i" class="flex items-start gap-3 rounded-xl px-3 py-2">
+                          <div class="mt-1 h-2 w-2 rounded-full bg-slate-600"></div>
+                          <div class="flex-1 space-y-1">
+                            <SkeletonLoader type="text" width="70%" height="0.875rem" />
+                            <SkeletonLoader type="text" width="50%" height="0.75rem" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </template>
+                <template v-else>
+                  <!-- 系统组件区域 -->
+                  <div class="mb-4">
+                    <button
+                      class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-300 hover:bg-slate-800/40"
+                      @click="toggleSystemComponents"
+                    >
+                      <span>系统组件</span>
+                      <svg
+                        class="h-4 w-4 transition-transform"
+                        :class="showSystemComponents ? 'rotate-90' : ''"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                      </svg>
+                    </button>
+                    <div v-if="showSystemComponents" class="ml-4 space-y-1">
+                      <button
+                        v-for="component in systemComponents"
+                        :key="`system-${component.name}`"
+                        class="group flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition"
+                        :class="selectedComponentId === `system-${component.name}` ? 'bg-sky-500/10 border border-sky-500/40' : 'border border-transparent hover:border-slate-700 hover:bg-slate-800/40'"
+                        @click="selectComponent(`system-${component.name}`, component)"
+                      >
+                        <span class="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-blue-400"></span>
+                        <div class="min-w-0">
+                          <p class="truncate text-sm font-medium text-slate-100">{{ component.displayName || component.name }}</p>
+                          <p class="mt-1 line-clamp-1 text-xs text-slate-400">{{ component.description || '系统组件' }}</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
 
-                <!-- 我的组件区域 -->
-                <div>
-                  <button
-                    class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-300 hover:bg-slate-800/40"
-                    @click="toggleUserComponents"
-                  >
-                    <span>我的组件</span>
-                    <svg
-                      class="h-4 w-4 transition-transform"
-                      :class="showUserComponents ? 'rotate-90' : ''"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                  </button>
-                  <div v-if="showUserComponents" class="ml-4 space-y-1">
+                  <!-- 我的组件区域 -->
+                  <div>
                     <button
-                      v-for="component in userComponents"
-                      :key="`user-${component.name}`"
-                      class="group flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition"
-                      :class="selectedComponentId === `user-${component.name}` ? 'bg-sky-500/10 border border-sky-500/40' : 'border border-transparent hover:border-slate-700 hover:bg-slate-800/40'"
-                      @click="selectComponent(`user-${component.name}`, component)"
+                      class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-300 hover:bg-slate-800/40"
+                      @click="toggleUserComponents"
                     >
-                      <span class="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400"></span>
-                      <div class="min-w-0">
-                        <p class="truncate text-sm font-medium text-slate-100">{{ component.displayName || component.name }}</p>
-                        <p class="mt-1 line-clamp-1 text-xs text-slate-400">{{ component.description || '用户组件' }}</p>
-                      </div>
+                      <span>我的组件</span>
+                      <svg
+                        class="h-4 w-4 transition-transform"
+                        :class="showUserComponents ? 'rotate-90' : ''"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                      </svg>
                     </button>
-                    <p v-if="!userComponents.length" class="px-3 py-4 text-xs text-slate-500">还没有自定义组件，点击右上角"新建组件"开始吧。</p>
+                    <div v-if="showUserComponents" class="ml-4 space-y-1">
+                      <button
+                        v-for="component in userComponents"
+                        :key="`user-${component.name}`"
+                        class="group flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition"
+                        :class="selectedComponentId === `user-${component.name}` ? 'bg-sky-500/10 border border-sky-500/40' : 'border border-transparent hover:border-slate-700 hover:bg-slate-800/40'"
+                        @click="selectComponent(`user-${component.name}`, component)"
+                      >
+                        <span class="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400"></span>
+                        <div class="min-w-0">
+                          <p class="truncate text-sm font-medium text-slate-100">{{ component.displayName || component.name }}</p>
+                          <p class="mt-1 line-clamp-1 text-xs text-slate-400">{{ component.description || '用户组件' }}</p>
+                        </div>
+                      </button>
+                      <p v-if="!userComponents.length" class="px-3 py-4 text-xs text-slate-500">还没有自定义组件，点击右上角"新建组件"开始吧。</p>
+                    </div>
                   </div>
-                </div>
+                </template>
               </div>
             </div>
           </section>
@@ -480,6 +567,8 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import ComponentManager from './components/ComponentManager.vue';
 import TriggerManager from './components/TriggerManager.vue';
 import SystemServices from './components/SystemServices.vue';
+import SkeletonLoader from './components/SkeletonLoader.vue';
+import { useDebounce } from './utils/debounce.js';
 
 const workflows = ref([]);
 const selectedWorkflowId = ref('');
@@ -492,6 +581,7 @@ const loadingStates = reactive({
   detail: false,
   saving: false,
   scripts: false,
+  components: false,
 });
 
 const statusMessage = reactive({ type: '', text: '' });
@@ -727,7 +817,8 @@ async function handleCreateWorkflow() {
   }
 }
 
-async function saveCurrentWorkflow() {
+// 防抖的保存函数
+const debouncedSaveWorkflow = useDebounce(async () => {
   if (!currentWorkflow.value) {
     return;
   }
@@ -752,6 +843,24 @@ async function saveCurrentWorkflow() {
     });
     currentWorkflow.value = normalized;
     originalWorkflowSnapshot.value = denormalizeWorkflow(normalized);
+    
+    // 如果工作流启用了Cron触发器，创建或更新触发器
+    if (currentWorkflow.value.enabled && currentWorkflow.value.trigger.type === 'cron' && currentWorkflow.value.trigger.cronExpression) {
+      try {
+        await updateCronTrigger(currentWorkflow.value.id, currentWorkflow.value.trigger.cronExpression);
+      } catch (triggerErr) {
+        console.warn('Failed to update cron trigger:', triggerErr);
+        setStatus('warning', '工作流已保存，但触发器更新失败');
+      }
+    } else if (currentWorkflow.value.trigger.type === 'cron') {
+      // 如果工作流被禁用或没有Cron表达式，删除触发器
+      try {
+        await removeCronTrigger(currentWorkflow.value.id);
+      } catch (triggerErr) {
+        console.warn('Failed to remove cron trigger:', triggerErr);
+      }
+    }
+    
     await fetchWorkflowsList();
     setStatus('success', '工作流已保存到 GitHub');
   } catch (err) {
@@ -760,6 +869,11 @@ async function saveCurrentWorkflow() {
   } finally {
     loadingStates.saving = false;
   }
+}, 1000);
+
+// 包装的保存函数
+async function saveCurrentWorkflow() {
+  await debouncedSaveWorkflow();
 }
 
 async function confirmDeleteWorkflow() {
@@ -785,8 +899,100 @@ async function confirmDeleteWorkflow() {
   }
 }
 
-function triggerManualRun() {
-  setStatus('info', '手动运行功能将在阶段二上线，敬请期待。');
+// 防抖的手动触发函数
+const debouncedTriggerManualRun = useDebounce(async () => {
+  if (!currentWorkflow.value) {
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/triggers/trigger/${currentWorkflow.value.id}`, {
+      method: 'POST'
+    });
+    
+    if (!res.ok) {
+      throw new Error('手动触发失败');
+    }
+    
+    setStatus('success', '工作流已手动触发执行');
+  } catch (err) {
+    setStatus('error', '手动触发失败: ' + err.message);
+  }
+}, 500);
+
+// 包装的手动触发函数
+async function triggerManualRun() {
+  await debouncedTriggerManualRun();
+}
+
+async function updateCronTrigger(workflowId, cronExpression) {
+  const res = await fetch(`/api/triggers/cron/${workflowId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cronExpression })
+  });
+  
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || '更新触发器失败');
+  }
+  
+  return await res.json();
+}
+
+async function removeCronTrigger(workflowId) {
+  const res = await fetch(`/api/triggers/cron/${workflowId}`, {
+    method: 'DELETE'
+  });
+  
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || '删除触发器失败');
+  }
+  
+  return await res.json();
+}
+
+function copyWebhookUrl() {
+  if (!currentWorkflow.value) return;
+  
+  const webhookUrl = `${window.location.origin}/api/webhook/${currentWorkflow.value.id}`;
+  navigator.clipboard.writeText(webhookUrl).then(() => {
+    setStatus('success', 'Webhook URL已复制到剪贴板');
+  }).catch(() => {
+    setStatus('error', '复制失败，请手动复制');
+  });
+}
+
+async function testWebhook(method) {
+  if (!currentWorkflow.value) return;
+  
+  try {
+    const webhookUrl = `/api/webhook/${currentWorkflow.value.id}`;
+    const options = {
+      method,
+      headers: { 'Content-Type': 'application/json' }
+    };
+    
+    if (method === 'POST') {
+      options.body = JSON.stringify({
+        test: true,
+        timestamp: new Date().toISOString(),
+        message: 'Webhook测试请求'
+      });
+    }
+    
+    const res = await fetch(webhookUrl, options);
+    const data = await res.json();
+    
+    if (res.ok) {
+      setStatus('success', `Webhook测试成功！任务ID: ${data.taskId}`);
+    } else {
+      setStatus('error', `Webhook测试失败: ${data.error}`);
+    }
+  } catch (err) {
+    setStatus('error', `Webhook测试失败: ${err.message}`);
+  }
 }
 
 async function fetchScripts() {
@@ -808,6 +1014,7 @@ async function fetchScripts() {
 
 // 组件管理相关方法
 async function fetchComponents() {
+  loadingStates.components = true;
   try {
     const res = await fetch('/api/components');
     if (!res.ok) {
@@ -823,6 +1030,8 @@ async function fetchComponents() {
   } catch (err) {
     console.error(err);
     setStatus('error', err.message || '获取组件列表失败');
+  } finally {
+    loadingStates.components = false;
   }
 }
 

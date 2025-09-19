@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import pkg from 'isolated-vm';
+const { Isolate } = pkg;
 import GitFS from '../core/gitfs.js';
 import { getConfig } from './configService.js';
 import { info, success, error, warning } from '../utils/logger.js';
@@ -334,20 +336,70 @@ class ComponentService {
    */
   async executeComponentCode(code, context) {
     try {
-      // 创建一个隔离的执行环境
-      const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+      // 创建isolated-vm隔离环境
+      const isolate = new Isolate({ memoryLimit: 128 });
+      const context_vm = await isolate.createContext();
       
-      // 定义组件函数
-      const componentFunction = new AsyncFunction('context', code);
+      // 设置全局对象
+      const jail = context_vm.global;
+      await jail.set('global', jail.derefInto());
       
-      // 执行组件
-      const result = await componentFunction(context);
+      // 创建安全的context对象
+      const contextObj = await context_vm.eval(`({
+        inputs: ${JSON.stringify(context.inputs || {})},
+        outputs: {},
+        context: ${JSON.stringify(context.context || {})},
+        log: {
+          info: (msg) => console.log('[INFO]', msg),
+          error: (msg) => console.error('[ERROR]', msg),
+          success: (msg) => console.log('[SUCCESS]', msg)
+        }
+      })`);
       
-      // 合并返回结果和context中的outputs
-      return {
-        ...context.outputs,
+      // 将context对象注入到隔离环境
+      await jail.set('context', contextObj);
+      
+      // 处理ES Module语法 - 将export default转换为return
+      let processedCode = code;
+      if (processedCode.includes('export default')) {
+        // 将export default function转换为普通函数
+        processedCode = processedCode.replace(
+          /export\s+default\s+async\s+function\s*\([^)]*\)\s*{/,
+          'async function componentFunction('
+        );
+        processedCode = processedCode.replace(
+          /export\s+default\s+function\s*\([^)]*\)\s*{/,
+          'function componentFunction('
+        );
+        
+        // 如果还有export default，替换为return
+        processedCode = processedCode.replace(/export\s+default\s+/, 'return ');
+        
+        // 在代码末尾添加函数调用
+        processedCode += '\n\n// 执行组件函数\nconst result = await componentFunction(context);\nresult;';
+      } else {
+        // 如果不是ES Module，直接执行
+        processedCode += '\n\n// 执行组件代码\nresult;';
+      }
+      
+      // 在隔离环境中执行代码
+      const result = await context_vm.eval(processedCode, { timeout: 30000 });
+      
+      // 获取执行后的outputs
+      const outputs = await contextObj.get('outputs');
+      const outputsObj = await outputs.get();
+      
+      // 合并返回结果
+      const finalResult = {
+        ...outputsObj,
         ...(result || {})
       };
+      
+      // 清理隔离环境
+      context_vm.release();
+      isolate.dispose();
+      
+      return finalResult;
     } catch (err) {
       error(`Component execution error: ${err.message}`);
       throw err;

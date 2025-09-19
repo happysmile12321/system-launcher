@@ -5,19 +5,19 @@ import { info, error, success } from '../../utils/logger.js';
 const router = express.Router();
 
 /**
- * 获取所有触发器列表
+ * 获取所有Cron触发器状态
  */
-router.get('/', async (req, res) => {
+router.get('/cron', async (req, res) => {
   try {
-    info('获取触发器列表');
-    const triggers = await triggerService.getAllTriggers();
+    info('获取Cron触发器列表');
+    const triggers = triggerService.getCronTriggersStatus();
     
     res.json({
       success: true,
       data: triggers
     });
   } catch (err) {
-    error(`获取触发器列表失败: ${err.message}`);
+    error(`获取Cron触发器列表失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message
@@ -26,33 +26,29 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * 创建新触发器
+ * 创建Cron触发器
  */
-router.post('/', async (req, res) => {
+router.post('/cron', async (req, res) => {
   try {
-    const { name, description, workflowId } = req.body;
+    const { workflowId, cronExpression } = req.body;
     
-    if (!name || !workflowId) {
+    if (!workflowId || !cronExpression) {
       res.status(400).json({
         success: false,
-        error: '缺少必要的触发器信息'
+        error: '缺少必要的工作流ID和Cron表达式'
       });
       return;
     }
     
-    info(`创建触发器: ${name}`);
-    const trigger = await triggerService.createTrigger({
-      name,
-      description,
-      workflowId
-    });
+    info(`创建Cron触发器: ${workflowId}`);
+    const trigger = await triggerService.createCronTrigger(workflowId, cronExpression);
     
     res.status(201).json({
       success: true,
       data: trigger
     });
   } catch (err) {
-    error(`创建触发器失败: ${err.message}`);
+    error(`创建Cron触发器失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message
@@ -61,19 +57,19 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * 获取触发器详情
+ * 获取特定Cron触发器状态
  */
-router.get('/:triggerId', async (req, res) => {
+router.get('/cron/:workflowId', async (req, res) => {
   try {
-    const { triggerId } = req.params;
-    info(`获取触发器详情: ${triggerId}`);
+    const { workflowId } = req.params;
+    info(`获取Cron触发器状态: ${workflowId}`);
     
-    const trigger = await triggerService.getTrigger(triggerId);
+    const trigger = triggerService.getCronTriggerStatus(workflowId);
     
     if (!trigger) {
       res.status(404).json({
         success: false,
-        error: '触发器不存在'
+        error: 'Cron触发器不存在'
       });
       return;
     }
@@ -83,7 +79,7 @@ router.get('/:triggerId', async (req, res) => {
       data: trigger
     });
   } catch (err) {
-    error(`获取触发器详情失败: ${err.message}`);
+    error(`获取Cron触发器状态失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message
@@ -92,22 +88,30 @@ router.get('/:triggerId', async (req, res) => {
 });
 
 /**
- * 更新触发器
+ * 更新Cron触发器
  */
-router.put('/:triggerId', async (req, res) => {
+router.put('/cron/:workflowId', async (req, res) => {
   try {
-    const { triggerId } = req.params;
-    const updateData = req.body;
+    const { workflowId } = req.params;
+    const { cronExpression } = req.body;
     
-    info(`更新触发器: ${triggerId}`);
-    const trigger = await triggerService.updateTrigger(triggerId, updateData);
+    if (!cronExpression) {
+      res.status(400).json({
+        success: false,
+        error: '缺少Cron表达式'
+      });
+      return;
+    }
+    
+    info(`更新Cron触发器: ${workflowId}`);
+    const trigger = await triggerService.updateCronTrigger(workflowId, cronExpression);
     
     res.json({
       success: true,
       data: trigger
     });
   } catch (err) {
-    error(`更新触发器失败: ${err.message}`);
+    error(`更新Cron触发器失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message
@@ -116,21 +120,21 @@ router.put('/:triggerId', async (req, res) => {
 });
 
 /**
- * 删除触发器
+ * 删除Cron触发器
  */
-router.delete('/:triggerId', async (req, res) => {
+router.delete('/cron/:workflowId', async (req, res) => {
   try {
-    const { triggerId } = req.params;
+    const { workflowId } = req.params;
     
-    info(`删除触发器: ${triggerId}`);
-    await triggerService.deleteTrigger(triggerId);
+    info(`删除Cron触发器: ${workflowId}`);
+    await triggerService.removeCronTrigger(workflowId);
     
     res.json({
       success: true,
-      message: '触发器删除成功'
+      message: 'Cron触发器删除成功'
     });
   } catch (err) {
-    error(`删除触发器失败: ${err.message}`);
+    error(`删除Cron触发器失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message
@@ -139,21 +143,21 @@ router.delete('/:triggerId', async (req, res) => {
 });
 
 /**
- * 获取触发器的调用记录
+ * 手动触发工作流执行
  */
-router.get('/:triggerId/requests', async (req, res) => {
+router.post('/trigger/:workflowId', async (req, res) => {
   try {
-    const { triggerId } = req.params;
-    info(`获取触发器调用记录: ${triggerId}`);
+    const { workflowId } = req.params;
+    info(`手动触发工作流: ${workflowId}`);
     
-    const requests = await triggerService.getTriggerRequests(triggerId);
+    const result = await triggerService.triggerWorkflow(workflowId);
     
     res.json({
       success: true,
-      data: requests
+      data: result
     });
   } catch (err) {
-    error(`获取触发器调用记录失败: ${err.message}`);
+    error(`手动触发工作流失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message
@@ -162,19 +166,28 @@ router.get('/:triggerId/requests', async (req, res) => {
 });
 
 /**
- * 刷新触发器列表
+ * 验证Cron表达式
  */
-router.post('/refresh', async (req, res) => {
+router.post('/validate-cron', async (req, res) => {
   try {
-    info('刷新触发器列表');
-    await triggerService.refresh();
+    const { cronExpression } = req.body;
+    
+    if (!cronExpression) {
+      res.status(400).json({
+        success: false,
+        error: '缺少Cron表达式'
+      });
+      return;
+    }
+    
+    const isValid = triggerService.validateCronExpression(cronExpression);
     
     res.json({
       success: true,
-      message: '触发器列表已刷新'
+      data: { valid: isValid }
     });
   } catch (err) {
-    error(`刷新触发器列表失败: ${err.message}`);
+    error(`验证Cron表达式失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message
