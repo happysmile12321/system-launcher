@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig, saveConfig, isConfigured, getConfig } from '../services/configService.js';
@@ -8,6 +9,15 @@ import { info, success, error, warning } from '../utils/logger.js';
 import GitFS from '../core/gitfs.js';
 import ScriptRunner from '../core/scriptRunner.js';
 import { startScheduler, stopScheduler, getSchedulerStatus, updateSchedulerConfig } from '../services/schedulerService.js';
+import feishuWebhookRouter from './routes/feishu.js';
+import managementApiRouter from './routes/management.js';
+import {
+  listWorkflows,
+  getWorkflow as getWorkflowById,
+  saveWorkflow as persistWorkflow,
+  createWorkflow,
+  deleteWorkflow as removeWorkflow,
+} from '../services/workflowService.js';
 
 // --- Initial Setup ---
 const __filename = fileURLToPath(import.meta.url);
@@ -27,10 +37,18 @@ app.use(async (req, res, next) => {
   }
   next();
 });
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 
 // --- Routes ---
+app.get('/', (req, res) => {
+  const appIndex = path.join(__dirname, 'public', 'app', 'index.html');
+  if (fs.existsSync(appIndex)) {
+    return res.sendFile(appIndex);
+  }
+  return res.status(503).send(`<!doctype html><html lang="zh-cn"><head><meta charset="utf-8"><title>构建中 · Orchestrator Pro</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}section{max-width:520px;padding:32px;border-radius:24px;background:rgba(15,23,42,0.85);border:1px solid rgba(148,163,184,0.2);backdrop-filter:blur(12px);}h1{font-size:1.5rem;margin-bottom:0.75rem;}code{background:rgba(15,118,110,0.15);padding:4px 8px;border-radius:8px;color:#5eead4;}</style></head><body><section><h1>前端资源尚未构建</h1><p>新的可视化工作流设计器需要先执行 <code>npm run web:build</code> 生成静态资源。</p><p style="margin-top:1rem;font-size:0.9rem;color:#94a3b8;">构建完成后刷新页面即可看到全新界面。</p></section></body></html>`);
+});
+
 // Serve the setup page
 app.get('/setup', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'setup.html'));
@@ -90,6 +108,65 @@ app.post('/api/orchestration', async (req, res) => {
   } catch (e) {
     error('Failed to save orchestration config: ' + e.message);
     res.status(500).json({ error: 'Failed to save orchestration config.' });
+  }
+});
+
+// Workflow management APIs
+app.get('/api/workflows', async (req, res) => {
+  try {
+    const workflows = await listWorkflows();
+    res.json({ workflows });
+  } catch (e) {
+    error('Failed to list workflows: ' + e.message);
+    res.status(500).json({ error: 'Failed to list workflows.' });
+  }
+});
+
+app.post('/api/workflows', async (req, res) => {
+  try {
+    const { name, description } = req.body ?? {};
+    const workflow = await createWorkflow({ name, description });
+    res.status(201).json(workflow);
+  } catch (e) {
+    error('Failed to create workflow: ' + e.message);
+    res.status(500).json({ error: 'Failed to create workflow.' });
+  }
+});
+
+app.get('/api/workflows/:workflowId', async (req, res) => {
+  try {
+    const workflow = await getWorkflowById(req.params.workflowId);
+    if (!workflow) {
+      return res.status(404).json({ error: 'Workflow not found.' });
+    }
+    res.json(workflow);
+  } catch (e) {
+    error('Failed to get workflow: ' + e.message);
+    res.status(500).json({ error: 'Failed to load workflow.' });
+  }
+});
+
+app.put('/api/workflows/:workflowId', async (req, res) => {
+  try {
+    const workflowId = req.params.workflowId;
+    if (!req.body || req.body.id !== workflowId) {
+      return res.status(400).json({ error: 'Workflow payload must include matching id.' });
+    }
+    const workflow = await persistWorkflow(req.body);
+    res.json(workflow);
+  } catch (e) {
+    error('Failed to save workflow: ' + e.message);
+    res.status(500).json({ error: 'Failed to save workflow.' });
+  }
+});
+
+app.delete('/api/workflows/:workflowId', async (req, res) => {
+  try {
+    await removeWorkflow(req.params.workflowId);
+    res.status(204).end();
+  } catch (e) {
+    error('Failed to delete workflow: ' + e.message);
+    res.status(500).json({ error: 'Failed to delete workflow.' });
   }
 });
 
@@ -250,6 +327,12 @@ app.post('/api/scheduler/update', async (req, res) => {
     res.status(500).json({ error: 'Failed to update scheduler configuration.' });
   }
 });
+
+// Feishu Webhook Route
+app.use('/api/feishu-webhooks', feishuWebhookRouter);
+
+// Management API Route
+app.use('/api/management', managementApiRouter);
 
 
 // --- Server Startup ---

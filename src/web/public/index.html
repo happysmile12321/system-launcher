@@ -15,19 +15,15 @@
             <p class="text-gray-600">Configure and automate your system orchestration</p>
         </header>
         
-        <nav class="main-nav mb-8">
-            <ul class="flex justify-center space-x-4">
-                <li><button id="nav-dashboard" class="nav-button active px-5 py-3 rounded-lg bg-blue-600 text-white font-medium cursor-pointer transition-all duration-200 hover:bg-blue-700">Dashboard</button></li>
-                <li><button id="nav-scripts" class="nav-button px-5 py-3 rounded-lg bg-gray-200 text-gray-700 font-medium cursor-pointer transition-all duration-200 hover:bg-gray-300">Scripts</button></li>
-            </ul>
-        </nav>
-        
         <div class="flex flex-col lg:flex-row gap-8">
             <main class="main-content flex-grow">
                 <!-- Dashboard Section -->
                 <section id="dashboard-section" class="content-section bg-white rounded-xl shadow-md p-6">
                     <div class="card">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Orchestration Configuration</h2>
+                        <div class="flex items-center justify-between mb-2">
+                            <h2 class="text-2xl font-bold text-gray-800">Orchestration Configuration</h2>
+                            <button id="manage-scripts-button" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"><i class="fa fa-code"></i> Manage Scripts</button>
+                        </div>
                         <p class="subtitle text-gray-600 mb-4">This JSON configuration is loaded from and saved to your private GitHub repository.</p>
                         <textarea id="json-editor" rows="20" class="w-full h-80 p-4 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                         <div class="card-actions flex flex-wrap gap-4 mt-4">
@@ -39,19 +35,66 @@
                             </button>
                         </div>
                     </div>
-                </section>
-                
-                <!-- Scripts Section -->
-                <section id="scripts-section" class="content-section hidden bg-white rounded-xl shadow-md p-6">
-                    <div class="card">
-                        <div class="card-header flex flex-wrap justify-between items-center gap-4 mb-6">
-                            <h2 class="text-2xl font-bold text-gray-800">Scripts</h2>
-                            <button id="create-script-button" class="button-primary px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-all duration-200 flex items-center gap-2">
-                                <i class="fa fa-plus"></i> Create New Script
-                            </button>
+
+                    <hr class="my-8 border-gray-200">
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Management API Panel -->
+                        <div class="bg-gray-50 rounded-xl border border-gray-200 p-5">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-lg font-semibold text-gray-800">Management API</h3>
+                                <span class="text-xs text-gray-500">Protected by X-Api-Key</span>
+                            </div>
+                            <div class="space-y-3">
+                                <label class="block text-sm text-gray-600">X-Api-Key <span class="text-gray-400">(copy from .orchestrator.config.json)</span></label>
+                                <input id="management-api-key" type="password" class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter Management API Key">
+                                <div class="flex gap-3">
+                                    <button id="btn-fetch-status" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Fetch Status</button>
+                                    <button id="btn-fetch-metrics" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">Fetch Metrics</button>
+                                </div>
+                                <div class="mt-3 grid grid-cols-3 gap-3 text-sm">
+                                    <div class="bg-white rounded-lg border p-3"><div class="text-gray-500">Version</div><div id="mgmt-version" class="font-semibold">-</div></div>
+                                    <div class="bg-white rounded-lg border p-3"><div class="text-gray-500">Uptime (s)</div><div id="mgmt-uptime" class="font-semibold">-</div></div>
+                                    <div class="bg-white rounded-lg border p-3"><div class="text-gray-500">Status</div><div id="mgmt-status" class="font-semibold">-</div></div>
+                                </div>
+                                <div class="mt-3">
+                                    <label class="block text-sm text-gray-600 mb-1">Metrics (Prometheus)</label>
+                                    <pre id="metrics-output" class="bg-white rounded-lg border p-3 max-h-64 overflow-auto text-xs"></pre>
+                                </div>
+                            </div>
                         </div>
-                        <div id="scripts-list">
-                            <!-- Scripts will be listed here -->
+
+                        <!-- Scheduler Panel -->
+                        <div class="bg-gray-50 rounded-xl border border-gray-200 p-5">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-lg font-semibold text-gray-800">Scheduler</h3>
+                                <span class="text-xs text-gray-500">Sync local config to GitHub</span>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="grid grid-cols-2 gap-3 text-sm">
+                                    <div class="bg-white rounded-lg border p-3"><div class="text-gray-500">Running</div><div id="scheduler-running" class="font-semibold">-</div></div>
+                                    <div class="bg-white rounded-lg border p-3"><div class="text-gray-500">Next Run</div><div id="scheduler-next" class="font-semibold truncate">-</div></div>
+                                </div>
+                                <label class="block text-sm text-gray-600">Cron Expression</label>
+                                <div class="flex gap-2">
+                                    <input id="cron-input" type="text" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 0 0 * * *">
+                                    <button id="btn-update-cron" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Update</button>
+                                </div>
+                                <p class="text-xs text-gray-500">Default runs daily at 00:00. Ensure GitHub config in setup is valid.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-8 border-gray-200">
+
+                    <!-- Simple Counters Visualization -->
+                    <div class="bg-gray-50 rounded-xl border border-gray-200 p-5">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Events & Counters</h3>
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                            <div class="bg-white rounded-lg border p-4"><div class="text-gray-500">Feishu Calls</div><div id="counter-feishu" class="text-2xl font-bold">0</div></div>
+                            <div class="bg-white rounded-lg border p-4"><div class="text-gray-500">Scripts Executed</div><div id="counter-scripts" class="text-2xl font-bold">0</div></div>
+                            <div class="bg-white rounded-lg border p-4"><div class="text-gray-500">Storage Uploaded</div><div id="counter-upload" class="text-2xl font-bold">0</div></div>
+                            <div class="bg-white rounded-lg border p-4"><div class="text-gray-500">Containers Ops</div><div id="counter-containers" class="text-2xl font-bold">0</div></div>
                         </div>
                     </div>
                 </section>
@@ -72,6 +115,24 @@
                     </div>
                 </div>
             </aside>
+        </div>
+        
+        <!-- Scripts List Modal -->
+        <div id="scripts-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="modal-content bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div class="modal-header flex justify-between items-center p-4 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold text-gray-800">Scripts</h2>
+                    <div class="flex items-center gap-3">
+                        <button id="create-script-button" class="button-primary px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-all duration-200 flex items-center gap-2">
+                            <i class="fa fa-plus"></i> Create
+                        </button>
+                        <button id="close-scripts-modal" class="button-secondary text-gray-500 hover:text-gray-700 text-2xl focus:outline-none">&times;</button>
+                    </div>
+                </div>
+                <div id="scripts-list" class="flex-grow overflow-auto">
+                    <!-- Scripts will be listed here -->
+                </div>
+            </div>
         </div>
         
         <!-- Script Editor Modal -->

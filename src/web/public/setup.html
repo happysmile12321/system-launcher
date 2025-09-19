@@ -62,6 +62,9 @@
                 <p class="text-gray-600">
                     Please provide your GitHub details to continue. This information will be stored locally and is required to persist your orchestration configurations.
                 </p>
+                <p class="text-gray-500 text-sm mt-2">
+                    Tip: Management API Key will be generated automatically and can be used on the dashboard to access <span class="font-medium">/api/management/*</span>.
+                </p>
             </div>
             
             <!-- Status Message -->
@@ -148,6 +151,51 @@
                             placeholder="e.g., 'orchestration.json'"
                         >
                     </div>
+                </div>
+                
+                <!-- Feishu Configuration -->
+                <div class="pt-4 border-t border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-800 mb-3">Feishu Integration (Optional)</h3>
+                    <div class="space-y-5">
+                        <!-- Feishu App ID -->
+                        <div>
+                            <label for="feishuAppId" class="block text-sm font-medium text-gray-700 mb-1">
+                                Feishu App ID
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fa fa-id-card-o text-gray-400"></i>
+                                </div>
+                                <input 
+                                    type="text" 
+                                    id="feishuAppId" 
+                                    name="feishuAppId" 
+                                    class="w-full rounded-lg border-gray-300 shadow-sm pl-10 pr-3 py-3 border input-focus transition duration-200 ease-in-out"
+                                    placeholder="Enter your Feishu App ID"
+                                >
+                            </div>
+                        </div>
+                        
+                        <!-- Feishu App Secret -->
+                        <div>
+                            <label for="feishuAppSecret" class="block text-sm font-medium text-gray-700 mb-1">
+                                Feishu App Secret
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fa fa-key text-gray-400"></i>
+                                </div>
+                                <input 
+                                    type="password" 
+                                    id="feishuAppSecret" 
+                                    name="feishuAppSecret" 
+                                    class="w-full rounded-lg border-gray-300 shadow-sm pl-10 pr-3 py-3 border input-focus transition duration-200 ease-in-out"
+                                    placeholder="Enter your Feishu App Secret"
+                                >
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-gray-500 text-xs mt-3">If Feishu credentials are provided, Feishu Drive will be used as storage backend.</p>
                 </div>
                 
                 <!-- Submit Button -->

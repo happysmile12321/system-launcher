@@ -14,28 +14,28 @@ let config = null;
  */
 function validateConfig(configObj) {
   try {
-    // 基本验证 - 确保配置对象包含必要字段
+    // Basic validation
     if (!configObj || typeof configObj !== 'object') {
-      warning('配置文件不是有效的JSON对象');
+      warning('Config is not a valid JSON object');
       return false;
     }
 
-    // 验证GitHub配置
-    if (!configObj.githubToken || !configObj.githubRepoOwner || !configObj.githubRepoName) {
-      warning('配置文件缺少必要的GitHub信息');
+    // Validate GitHub config
+    if (!configObj.github?.token || !configObj.github?.owner || !configObj.github?.repo) {
+      warning('Config is missing necessary GitHub information');
       return false;
     }
 
-    // 验证定时任务配置
+    // Validate scheduler config
     if (configObj.scheduler && !configObj.scheduler.cronExpression) {
-      warning('定时任务配置缺少cron表达式');
+      warning('Scheduler config is missing cron expression');
       return false;
     }
 
-    success('配置文件验证通过');
+    success('Config validation passed');
     return true;
   } catch (err) {
-    error(`配置文件验证失败: ${err.message}`);
+    error(`Config validation failed: ${err.message}`);
     return false;
   }
 }
@@ -45,56 +45,46 @@ function validateConfig(configObj) {
  */
 async function checkAndSyncConfig() {
   try {
-    info('开始执行定时配置同步任务...');
+    info('Starting scheduled config sync...');
 
-    // 重新加载最新配置
     const latestConfig = await loadConfig();
     if (!latestConfig) {
-      warning('没有找到配置文件，跳过同步');
+      warning('No config file found, skipping sync.');
       return;
     }
 
-    // 验证配置文件
     if (!validateConfig(latestConfig)) {
-      warning('配置文件验证失败，跳过同步');
+      warning('Config validation failed, skipping sync.');
       return;
     }
 
     try {
-      // 创建GitFS实例
-      const gitfs = new GitFS(latestConfig);
+      const gitfs = new GitFS(latestConfig.github);
       
-      // 检查配置文件是否需要同步
-      // 1. 读取本地配置文件
-      const localConfigPath = '.orchestrator.config.json';
       const localConfigContent = JSON.stringify(latestConfig, null, 2);
+      const gitConfigPath = latestConfig.github.configFile || 'config/system.json';
       
-      // 2. 读取GitHub上的配置文件
-      const gitConfigPath = 'config/system.json';
       const gitConfigData = await gitfs.readFile(gitConfigPath);
       
-      // 3. 比较内容是否不同
       if (!gitConfigData || gitConfigData.content !== localConfigContent) {
-        // 确保config目录存在
-        await gitfs.createDirectory('config');
+        await gitfs.createDirectory(gitConfigPath.substring(0, gitConfigPath.lastIndexOf('/')));
         
-        // 保存配置文件到GitHub
         await gitfs.writeFile(
           gitConfigPath,
           localConfigContent,
           `chore: automated config sync at ${new Date().toISOString()}`
         );
         
-        success(`配置文件已成功同步到GitHub仓库`);
+        success(`Config successfully synced to GitHub repository.`);
       } else {
-        info('配置文件与GitHub仓库版本一致，无需同步');
+        info('Config is already up to date with the GitHub repository.');
       }
     } catch (gitErr) {
-      error(`GitHub同步失败: ${gitErr.message}`);
+      error(`GitHub sync failed: ${gitErr.message}`);
     }
 
   } catch (err) {
-    error(`定时配置同步任务执行失败: ${err.message}`);
+    error(`Scheduled config sync task failed: ${err.message}`);
   }
 }
 
