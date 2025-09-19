@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
  */
 class ComponentService {
   constructor() {
-    this.officialComponents = new Map();
+    this.localComponents = new Map();
     this.userComponents = new Map();
     this.componentCache = new Map();
     this.loaded = false;
@@ -39,7 +39,7 @@ class ComponentService {
       await this.loadUserComponents();
       
       this.loaded = true;
-      success(`Component system initialized successfully. Loaded ${this.officialComponents.size} local components and ${this.userComponents.size} user components.`);
+      success(`Component system initialized successfully. Loaded ${this.localComponents.size} local components and ${this.userComponents.size} user components.`);
     } catch (err) {
       error(`Failed to initialize component system: ${err.message}`);
       throw err;
@@ -225,7 +225,7 @@ class ComponentService {
       });
 
       // 存储组件信息
-      const componentsMap = componentType === 'local' ? this.officialComponents : this.userComponents;
+      const componentsMap = componentType === 'local' ? this.localComponents : this.userComponents;
       componentsMap.set(componentName, {
         name: componentName,
         displayName: manifest.displayName || componentName,
@@ -386,7 +386,7 @@ async function executeComponent() {
       result = await componentFunction(execContext);
     } else {
       // 如果不是函数，直接执行代码
-      result = await eval(\`(async function() { \${componentCode} })()\`);
+      result = await eval(\`(async function() { \${codeContent} })()\`);
     }
     
     // 返回结果
@@ -490,7 +490,7 @@ executeComponent();
   async getAllComponents() {
     await this.initialize();
     
-    const localComponents = Array.from(this.officialComponents.values());
+    const localComponents = Array.from(this.localComponents.values());
     const userComponents = Array.from(this.userComponents.values());
     
     return {
@@ -505,7 +505,7 @@ executeComponent();
   async getComponent(componentType, componentName) {
     await this.initialize();
     
-    const componentsMap = componentType === 'local' ? this.officialComponents : this.userComponents;
+    const componentsMap = componentType === 'local' ? this.localComponents : this.userComponents;
     const component = componentsMap.get(componentName);
     
     if (!component) {
@@ -533,7 +533,7 @@ executeComponent();
   async refresh() {
     info('Refreshing component list...');
     
-    this.officialComponents.clear();
+    this.localComponents.clear();
     this.userComponents.clear();
     this.componentCache.clear();
     this.loaded = false;

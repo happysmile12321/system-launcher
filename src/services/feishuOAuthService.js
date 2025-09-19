@@ -1,14 +1,15 @@
 import { info, success, error, warning } from '../utils/logger.js';
 import { getConfig, saveConfig } from './configService.js';
+import GitFS from '../core/gitfs.js';
 
 /**
  * Feishu OAuth 服务
  */
 class FeishuOAuthService {
   constructor() {
-    this.clientId = process.env.FEISHU_CLIENT_ID;
-    this.clientSecret = process.env.FEISHU_CLIENT_SECRET;
-    this.redirectUri = process.env.FEISHU_REDIRECT_URI || 'http://localhost:3000/auth/feishu/callback';
+    this.appId = process.env.FEISHU_APP_ID || process.env.FEISHU_CLIENT_ID;
+    this.appSecret = process.env.FEISHU_APP_SECRET || process.env.FEISHU_CLIENT_SECRET;
+    this.redirectUri = process.env.FEISHU_REDIRECT_URI || 'http://localhost:3000/api/feishu/auth/callback';
     this.baseUrl = 'https://open.feishu.cn/open-apis';
     this.tokenCache = new Map();
   }
@@ -19,19 +20,17 @@ class FeishuOAuthService {
    * @returns {string} - 授权URL
    */
   generateAuthUrl(state) {
-    if (!this.clientId) {
-      throw new Error('Feishu Client ID not configured');
+    if (!this.appId) {
+      throw new Error('Feishu App ID not configured. Please set FEISHU_APP_ID environment variable.');
     }
 
     const params = new URLSearchParams({
-      client_id: this.clientId,
+      app_id: this.appId,
       redirect_uri: this.redirectUri,
-      response_type: 'code',
-      scope: 'user:read,drive:read,drive:write',
       state: state
     });
 
-    return `${this.baseUrl}/authen/v1/authorize?${params.toString()}`;
+    return `${this.baseUrl}/authen/v1/index?${params.toString()}`;
   }
 
   /**
@@ -51,8 +50,8 @@ class FeishuOAuthService {
         },
         body: JSON.stringify({
           grant_type: 'authorization_code',
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
+          app_id: this.appId,
+          app_secret: this.appSecret,
           code: code,
           redirect_uri: this.redirectUri
         })
@@ -229,22 +228,42 @@ class FeishuOAuthService {
    * 保存令牌到配置文件
    * @param {Object} tokens - 令牌信息
    */
-  async saveTokensToConfig(tokens) {
+  async saveTokensToConfig(tokens, userInfo = null) {
     try {
-      const config = await getConfig();
+      const config = getConfig();
+      const gitfs = new GitFS(config);
       
-      if (!config.feishu) {
-        config.feishu = {};
+      // 获取用户信息
+      let userData = userInfo;
+      if (!userData && tokens.accessToken) {
+        try {
+          userData = await this.getUserInfo(tokens.accessToken);
+        } catch (err) {
+          warning(`Failed to get user info: ${err.message}`);
+        }
       }
       
-      config.feishu.tokens = tokens;
-      config.feishu.authenticated = true;
-      config.feishu.authenticatedAt = new Date().toISOString();
+      const authData = {
+        authenticated: true,
+        authenticatedAt: new Date().toISOString(),
+        tokens: tokens,
+        userInfo: userData
+      };
       
-      await saveConfig(config);
+      // 确保.orchestrator-pro目录存在
+      await gitfs.createDirectory('.orchestrator-pro');
+      
+      // 保存到GitFS
+      await gitfs.writeFile(
+        '.orchestrator-pro/feishu-auth.json',
+        JSON.stringify(authData, null, 2),
+        'Update Feishu authentication status'
+      );
+      
+      success('Feishu authentication status saved to GitFS');
       
     } catch (err) {
-      warning(`Failed to save tokens to config: ${err.message}`);
+      warning(`Failed to save tokens to GitFS: ${err.message}`);
     }
   }
 
@@ -291,8 +310,21 @@ class FeishuOAuthService {
    */
   async getAuthStatus() {
     try {
-      const config = await getConfig();
-      const isAuth = config.feishu?.authenticated === true;
+      const config = getConfig();
+      const gitfs = new GitFS(config);
+      
+      // 从GitFS读取飞书认证状态
+      const authFile = await gitfs.readFile('.orchestrator-pro/feishu-auth.json');
+      
+      if (!authFile) {
+        return {
+          authenticated: false,
+          authUrl: this.generateAuthUrl('feishu_auth_' + Date.now())
+        };
+      }
+
+      const authData = JSON.parse(authFile.content);
+      const isAuth = authData.authenticated === true;
       
       if (!isAuth) {
         return {
@@ -301,7 +333,7 @@ class FeishuOAuthService {
         };
       }
 
-      const tokens = config.feishu.tokens;
+      const tokens = authData.tokens;
       const now = new Date();
       const tokenAge = now - new Date(tokens.obtainedAt);
       const expiresInMs = tokens.expiresIn * 1000;
@@ -311,14 +343,15 @@ class FeishuOAuthService {
         authenticated: true,
         isExpired,
         expiresAt: new Date(new Date(tokens.obtainedAt).getTime() + expiresInMs),
-        scope: tokens.scope
+        scope: tokens.scope,
+        userInfo: authData.userInfo
       };
 
     } catch (err) {
       error(`Failed to get auth status: ${err.message}`);
       return {
         authenticated: false,
-        error: err.message
+        authUrl: this.generateAuthUrl('feishu_auth_' + Date.now())
       };
     }
   }

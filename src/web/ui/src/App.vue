@@ -1685,9 +1685,29 @@ async function connectFeishu() {
     const res = await fetch('/api/feishu/auth/start');
     if (res.ok) {
       const data = await res.json();
-      if (data.authUrl) {
-        window.open(data.authUrl, '_blank');
+      if (data.success && data.data.authUrl) {
+        // 打开新窗口进行OAuth认证
+        const authWindow = window.open(
+          data.data.authUrl,
+          'feishu_auth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+        
+        // 监听窗口关闭事件
+        const checkClosed = setInterval(() => {
+          if (authWindow.closed) {
+            clearInterval(checkClosed);
+            // 重新检查认证状态
+            checkFeishuAuthStatus();
+          }
+        }, 1000);
+        
+        setStatus('info', '请在弹窗中完成飞书登录');
+      } else {
+        setStatus('error', data.error || '启动飞书认证失败');
       }
+    } else {
+      setStatus('error', '启动飞书认证失败');
     }
   } catch (err) {
     console.error('启动飞书认证失败:', err);

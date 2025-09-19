@@ -397,13 +397,20 @@ async function startServer() {
 
   // 初始化容器备份服务
   try {
-    const { default: WorkflowService } = await import('../services/workflowService.js');
-    const { default: TriggerService } = await import('../services/triggerService.js');
-    const { default: ComponentService } = await import('../services/componentService.js');
+    const triggerService = (await import('../services/triggerService.js')).default;
+    const componentService = (await import('../services/componentService.js')).default;
     
-    const workflowService = new WorkflowService();
-    const triggerService = new TriggerService();
-    const componentService = new ComponentService();
+    // workflowService 导出的是函数，我们创建一个包装对象
+    const workflowService = {
+      createWorkflow: (await import('../services/workflowService.js')).createWorkflow,
+      getAllWorkflows: async () => {
+        const workflows = await (await import('../services/workflowService.js')).listWorkflows();
+        return { workflows };
+      },
+      getWorkflow: (await import('../services/workflowService.js')).getWorkflow,
+      saveWorkflow: (await import('../services/workflowService.js')).saveWorkflow,
+      deleteWorkflow: (await import('../services/workflowService.js')).deleteWorkflow
+    };
     
     initializeContainerBackupService(workflowService, triggerService, componentService);
     info('容器备份服务初始化完成');

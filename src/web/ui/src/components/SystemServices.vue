@@ -75,42 +75,6 @@
         </div>
       </div>
 
-      <div class="installed-services-section">
-        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-300 mb-4">已安装服务</h3>
-        
-        <div v-if="installedServices.length === 0" class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-          <p class="text-sm text-slate-500 mt-2">还没有安装任何系统服务</p>
-        </div>
-        
-        <div v-else class="installed-list">
-          <div
-            v-for="service in installedServices"
-            :key="service.id"
-            class="installed-service-item"
-          >
-            <div class="flex items-center gap-3">
-              <component :is="service.icon" class="w-5 h-5 text-sky-400" />
-              <div>
-                <h4 class="text-sm font-medium text-slate-100">{{ service.name }}</h4>
-                <p class="text-xs text-slate-400">{{ service.description }}</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-slate-500">v{{ service.version }}</span>
-              <button
-                class="text-xs text-sky-300 hover:text-sky-200"
-                @click="openService(service)"
-              >
-                打开
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- 安装确认模态框 -->

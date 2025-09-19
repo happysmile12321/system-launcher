@@ -59,32 +59,66 @@ router.get('/auth/callback', async (req, res) => {
     const { code, state } = req.query;
     
     if (!code) {
-      return res.status(400).json({
-        success: false,
-        error: 'Authorization code is required'
-      });
+      return res.status(400).send(`
+        <html>
+          <head><title>飞书认证失败</title></head>
+          <body>
+            <h2>认证失败</h2>
+            <p>未收到授权码，请重试。</p>
+            <script>
+              setTimeout(() => {
+                window.close();
+              }, 3000);
+            </script>
+          </body>
+        </html>
+      `);
     }
-    
+
+    // 交换授权码获取访问令牌
     const tokens = await feishuOAuthService.exchangeCodeForToken(code, state);
+    
+    // 获取用户信息
     const userInfo = await feishuOAuthService.getUserInfo(tokens.accessToken);
     
-    success('Feishu OAuth authentication completed');
+    // 保存认证状态
+    await feishuOAuthService.saveTokensToConfig(tokens, userInfo);
     
-    res.json({
-      success: true,
-      data: {
-        tokens,
-        userInfo
-      }
-    });
+    res.send(`
+      <html>
+        <head><title>飞书认证成功</title></head>
+        <body>
+          <h2>认证成功！</h2>
+          <p>欢迎，${userInfo.name || userInfo.email || '用户'}！</p>
+          <p>您可以关闭此窗口。</p>
+          <script>
+            setTimeout(() => {
+              window.close();
+            }, 2000);
+          </script>
+        </body>
+      </html>
+    `);
+    
   } catch (err) {
-    error(`Feishu OAuth callback failed: ${err.message}`);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    error(`Failed to handle Feishu callback: ${err.message}`);
+    res.status(500).send(`
+      <html>
+        <head><title>飞书认证失败</title></head>
+        <body>
+          <h2>认证失败</h2>
+          <p>错误信息：${err.message}</p>
+          <script>
+            setTimeout(() => {
+              window.close();
+            }, 3000);
+          </script>
+        </body>
+      </html>
+    `);
   }
 });
+
 
 /**
  * 登出Feishu
