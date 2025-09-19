@@ -36,6 +36,13 @@
           </button>
           <button 
             class="rounded-lg px-4 py-2 text-sm font-medium transition" 
+            :class="activeTab === 'database' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
+            @click="activeTab = 'database'"
+          >
+            数据库管理
+          </button>
+          <button 
+            class="rounded-lg px-4 py-2 text-sm font-medium transition" 
             :class="activeTab === 'settings' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
             @click="activeTab = 'settings'"
           >
@@ -552,6 +559,162 @@
         </div>
       </template>
 
+      <!-- 数据库管理页面 -->
+      <template v-else-if="activeTab === 'database'">
+        <div class="space-y-6">
+          <!-- 飞书文件管理 -->
+          <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h2 class="text-lg font-semibold text-slate-100">飞书文件管理</h2>
+                <p class="text-sm text-slate-400 mt-1">管理飞书云盘中的文件和备份计划</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/10"
+                  @click="refreshFeishuFiles"
+                >
+                  刷新文件列表
+                </button>
+                <button
+                  class="rounded-lg border border-emerald-500 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10"
+                  @click="createBackupPlan"
+                >
+                  创建备份计划
+                </button>
+              </div>
+            </div>
+
+            <!-- 飞书认证状态 -->
+            <div v-if="!feishuAuthStatus.authenticated" class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-6">
+              <div class="flex items-center gap-2">
+                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                <span class="text-sm text-amber-200">需要先连接飞书账户才能管理文件</span>
+              </div>
+              <button
+                class="mt-3 rounded-lg border border-amber-500 px-3 py-1 text-xs font-medium text-amber-300 transition hover:bg-amber-500/10"
+                @click="connectFeishu"
+              >
+                连接飞书账户
+              </button>
+            </div>
+
+            <!-- 文件列表 -->
+            <div v-else class="space-y-4">
+              <div v-if="feishuFilesLoading" class="flex items-center justify-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+                <span class="ml-2 text-sm text-slate-400">加载文件列表中...</span>
+              </div>
+              
+              <div v-else-if="feishuFiles.length === 0" class="text-center py-8">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                  <polyline points="14,2 14,8 20,8"></polyline>
+                </svg>
+                <h3 class="mt-4 text-lg font-medium text-slate-300">暂无文件</h3>
+                <p class="mt-2 text-slate-500">飞书云盘中还没有文件</p>
+              </div>
+
+              <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div
+                  v-for="file in feishuFiles"
+                  :key="file.token"
+                  class="rounded-lg border border-slate-700 bg-slate-800/40 p-4 hover:bg-slate-800/60 transition"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <h4 class="text-sm font-medium text-slate-100 truncate">{{ file.name }}</h4>
+                      <p class="text-xs text-slate-400 mt-1">{{ file.type === 'file' ? '文件' : '文件夹' }}</p>
+                      <p class="text-xs text-slate-500 mt-1">{{ formatFileSize(file.size) }}</p>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <button
+                        class="rounded border border-slate-600 px-2 py-1 text-xs text-slate-300 transition hover:bg-slate-700"
+                        @click="downloadFile(file)"
+                      >
+                        下载
+                      </button>
+                      <button
+                        class="rounded border border-red-500/40 px-2 py-1 text-xs text-red-300 transition hover:bg-red-500/10"
+                        @click="deleteFile(file)"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 备份计划管理 -->
+          <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h2 class="text-lg font-semibold text-slate-100">备份计划管理</h2>
+                <p class="text-sm text-slate-400 mt-1">管理自动备份任务和计划</p>
+              </div>
+              <button
+                class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/10"
+                @click="refreshBackupPlans"
+              >
+                刷新计划
+              </button>
+            </div>
+
+            <div v-if="backupPlansLoading" class="flex items-center justify-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+              <span class="ml-2 text-sm text-slate-400">加载备份计划中...</span>
+            </div>
+
+            <div v-else-if="backupPlans.length === 0" class="text-center py-8">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
+                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              <h3 class="mt-4 text-lg font-medium text-slate-300">暂无备份计划</h3>
+              <p class="mt-2 text-slate-500">还没有创建任何备份计划</p>
+            </div>
+
+            <div v-else class="space-y-4">
+              <div
+                v-for="plan in backupPlans"
+                :key="plan.id"
+                class="rounded-lg border border-slate-700 bg-slate-800/40 p-4"
+              >
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <h4 class="text-sm font-medium text-slate-100">{{ plan.name }}</h4>
+                    <p class="text-xs text-slate-400 mt-1">{{ plan.description }}</p>
+                    <p class="text-xs text-slate-500 mt-1">
+                      频率: {{ plan.schedule }} | 状态: 
+                      <span :class="plan.enabled ? 'text-emerald-400' : 'text-slate-500'">
+                        {{ plan.enabled ? '启用' : '禁用' }}
+                      </span>
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button
+                      class="rounded border border-slate-600 px-2 py-1 text-xs text-slate-300 transition hover:bg-slate-700"
+                      @click="editBackupPlan(plan)"
+                    >
+                      编辑
+                    </button>
+                    <button
+                      class="rounded border border-red-500/40 px-2 py-1 text-xs text-red-300 transition hover:bg-red-500/10"
+                      @click="deleteBackupPlan(plan)"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
       <!-- 设置页面 -->
       <template v-else-if="activeTab === 'settings'">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur">
@@ -597,6 +760,13 @@ const currentComponent = ref(null);
 const currentComponentType = ref('');
 const showSystemComponents = ref(true);
 const showUserComponents = ref(true);
+
+// 数据库管理相关状态
+const feishuAuthStatus = ref({ authenticated: false, user: null });
+const feishuFiles = ref([]);
+const feishuFilesLoading = ref(false);
+const backupPlans = ref([]);
+const backupPlansLoading = ref(false);
 
 const statusClasses = computed(() => {
   if (statusMessage.type === 'error') {
@@ -1035,6 +1205,163 @@ async function fetchComponents() {
   }
 }
 
+// 数据库管理相关方法
+async function checkFeishuAuthStatus() {
+  try {
+    const res = await fetch('/api/feishu/auth/status');
+    if (res.ok) {
+      const data = await res.json();
+      feishuAuthStatus.value = data;
+    }
+  } catch (err) {
+    console.error('检查飞书认证状态失败:', err);
+  }
+}
+
+async function connectFeishu() {
+  try {
+    const res = await fetch('/api/feishu/auth/start');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.authUrl) {
+        window.open(data.authUrl, '_blank');
+      }
+    }
+  } catch (err) {
+    console.error('启动飞书认证失败:', err);
+    setStatus('error', '启动飞书认证失败');
+  }
+}
+
+async function refreshFeishuFiles() {
+  if (!feishuAuthStatus.value.authenticated) {
+    setStatus('error', '请先连接飞书账户');
+    return;
+  }
+
+  feishuFilesLoading.value = true;
+  try {
+    const res = await fetch('/api/feishu/fs/list');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        feishuFiles.value = data.data || [];
+        setStatus('success', '文件列表刷新成功');
+      } else {
+        setStatus('error', data.error || '获取文件列表失败');
+      }
+    } else {
+      setStatus('error', '获取文件列表失败');
+    }
+  } catch (err) {
+    console.error('刷新文件列表失败:', err);
+    setStatus('error', '刷新文件列表失败');
+  } finally {
+    feishuFilesLoading.value = false;
+  }
+}
+
+async function downloadFile(file) {
+  try {
+    const res = await fetch(`/api/feishu/fs/download/${file.token}`);
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setStatus('success', '文件下载成功');
+    } else {
+      setStatus('error', '文件下载失败');
+    }
+  } catch (err) {
+    console.error('下载文件失败:', err);
+    setStatus('error', '下载文件失败');
+  }
+}
+
+async function deleteFile(file) {
+  if (!confirm(`确定要删除文件 "${file.name}" 吗？`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/feishu/fs/${file.token}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        setStatus('success', '文件删除成功');
+        await refreshFeishuFiles();
+      } else {
+        setStatus('error', data.error || '文件删除失败');
+      }
+    } else {
+      setStatus('error', '文件删除失败');
+    }
+  } catch (err) {
+    console.error('删除文件失败:', err);
+    setStatus('error', '删除文件失败');
+  }
+}
+
+async function refreshBackupPlans() {
+  backupPlansLoading.value = true;
+  try {
+    // 这里应该调用备份计划API，暂时使用模拟数据
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    backupPlans.value = [
+      {
+        id: '1',
+        name: '每日备份',
+        description: '每天凌晨2点自动备份重要文件',
+        schedule: '0 2 * * *',
+        enabled: true
+      },
+      {
+        id: '2',
+        name: '每周备份',
+        description: '每周日晚上10点备份所有文件',
+        schedule: '0 22 * * 0',
+        enabled: false
+      }
+    ];
+  } catch (err) {
+    console.error('获取备份计划失败:', err);
+    setStatus('error', '获取备份计划失败');
+  } finally {
+    backupPlansLoading.value = false;
+  }
+}
+
+function createBackupPlan() {
+  setStatus('info', '创建备份计划功能开发中...');
+}
+
+function editBackupPlan(plan) {
+  setStatus('info', `编辑备份计划 "${plan.name}" 功能开发中...`);
+}
+
+function deleteBackupPlan(plan) {
+  if (!confirm(`确定要删除备份计划 "${plan.name}" 吗？`)) {
+    return;
+  }
+  setStatus('info', `删除备份计划 "${plan.name}" 功能开发中...`);
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 function toggleSystemComponents() {
   showSystemComponents.value = !showSystemComponents.value;
 }
@@ -1124,6 +1451,8 @@ onMounted(() => {
   fetchWorkflowsList();
   fetchScripts();
   fetchComponents();
+  checkFeishuAuthStatus();
+  refreshBackupPlans();
 });
 </script>
 

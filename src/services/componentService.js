@@ -359,14 +359,19 @@ class ComponentService {
       // 将context对象注入到隔离环境
       await jail.set('context', contextObj);
       
-      // 处理ES Module语法 - 将export default转换为return
+      // 处理ES Module语法和ES6语法兼容性
       let processedCode = code;
+      
+      // 将ES6语法转换为ES5兼容语法
+      processedCode = processedCode
+        .replace(/\bconst\b/g, 'var')
+        .replace(/\blet\b/g, 'var')
+        .replace(/=>/g, 'function() { return ')
+        .replace(/async\s+function/g, 'function')
+        .replace(/await\s+/g, '');
+      
       if (processedCode.includes('export default')) {
         // 将export default function转换为普通函数
-        processedCode = processedCode.replace(
-          /export\s+default\s+async\s+function\s*\([^)]*\)\s*{/,
-          'async function componentFunction('
-        );
         processedCode = processedCode.replace(
           /export\s+default\s+function\s*\([^)]*\)\s*{/,
           'function componentFunction('
@@ -376,7 +381,7 @@ class ComponentService {
         processedCode = processedCode.replace(/export\s+default\s+/, 'return ');
         
         // 在代码末尾添加函数调用
-        processedCode += '\n\n// 执行组件函数\nconst result = await componentFunction(context);\nresult;';
+        processedCode += '\n\n// 执行组件函数\nvar result = componentFunction(context);\nresult;';
       } else {
         // 如果不是ES Module，直接执行
         processedCode += '\n\n// 执行组件代码\nresult;';

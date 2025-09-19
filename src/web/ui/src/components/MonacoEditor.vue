@@ -55,10 +55,13 @@ export default {
         horizontal: 'auto',
         useShadows: false,
         verticalHasArrows: false,
-        horizontalHasArrows: false
+        horizontalHasArrows: false,
+        verticalScrollbarSize: 12,
+        horizontalScrollbarSize: 12
       },
       folding: true,
       wordWrap: 'on',
+      wrappingIndent: 'indent',
       ...props.options
     };
 
@@ -133,10 +136,23 @@ export default {
   border: 1px solid #374151;
   border-radius: 0.5rem;
   overflow: hidden;
+  position: relative;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .monaco-editor-container:focus-within {
   border-color: #0ea5e9;
   box-shadow: 0 0 0 1px #0ea5e9;
+}
+
+/* 确保Monaco编辑器不会超出容器 */
+.monaco-editor-container :deep(.monaco-editor) {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.monaco-editor-container :deep(.monaco-editor .view-lines) {
+  max-width: 100% !important;
 }
 </style>

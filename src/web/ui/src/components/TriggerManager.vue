@@ -6,12 +6,20 @@
           <h2 class="text-lg font-semibold text-slate-100">触发器管理</h2>
           <p class="text-sm text-slate-400 mt-1">管理所有工作流的入口触发器</p>
         </div>
-        <button
-          class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/10"
-          @click="createWebhook"
-        >
-          + 创建 Webhook
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/10"
+            @click="createCronTrigger"
+          >
+            + 创建定时触发器
+          </button>
+          <button
+            class="rounded-lg border border-emerald-500 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10"
+            @click="createWebhook"
+          >
+            + 创建 Webhook
+          </button>
+        </div>
       </div>
     </div>
 
@@ -104,6 +112,53 @@
               删除
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 创建 Cron 触发器模态框 -->
+    <div v-if="showCreateCronModal" class="modal-overlay" @click="closeCreateCronModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3 class="text-lg font-semibold text-slate-100">创建定时触发器</h3>
+          <button class="modal-close" @click="closeCreateCronModal">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">关联工作流</label>
+            <select v-model="newCronTrigger.workflowId" class="form-select">
+              <option value="">请选择工作流</option>
+              <option v-for="workflow in workflows" :key="workflow.id" :value="workflow.id">
+                {{ workflow.name || workflow.id }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Cron 表达式</label>
+            <input
+              v-model="newCronTrigger.cronExpression"
+              type="text"
+              class="form-input"
+              placeholder="如：0 * * * * (每小时执行)"
+            />
+            <p class="text-xs text-slate-500 mt-1">
+              格式：分 时 日 月 周。例如：0 9 * * 1-5 (工作日每天9点执行)
+            </p>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="closeCreateCronModal">取消</button>
+          <button class="btn-primary" @click="submitCreateCronTrigger" :disabled="!newCronTrigger.workflowId || !newCronTrigger.cronExpression">
+            创建触发器
+          </button>
         </div>
       </div>
     </div>
@@ -274,6 +329,7 @@ export default {
     const webhooks = ref([]);
     const workflows = ref([]);
     const showCreateModal = ref(false);
+    const showCreateCronModal = ref(false);
     const showRequestsModal = ref(false);
     const showRequestDetailModal = ref(false);
     const requestsLoading = ref(false);
@@ -287,20 +343,48 @@ export default {
       workflowId: ''
     });
 
+    const newCronTrigger = ref({
+      workflowId: '',
+      cronExpression: ''
+    });
+
     // 获取触发器列表
     async function fetchWebhooks() {
       loading.value = true;
       try {
-        const res = await fetch('/api/triggers');
-        if (!res.ok) {
-          throw new Error('无法获取触发器列表');
+        // 获取Cron触发器列表
+        const cronRes = await fetch('/api/triggers/cron');
+        let cronTriggers = [];
+        if (cronRes.ok) {
+          const cronData = await cronRes.json();
+          if (cronData.success) {
+            cronTriggers = cronData.data || [];
+          }
         }
-        const data = await res.json();
-        if (data.success) {
-          webhooks.value = data.data || [];
-        } else {
-          alert('获取触发器列表失败: ' + data.error);
+
+        // 获取Webhook触发器列表（如果有的话）
+        const webhookRes = await fetch('/api/triggers');
+        let webhookTriggers = [];
+        if (webhookRes.ok) {
+          const webhookData = await webhookRes.json();
+          if (webhookData.success) {
+            webhookTriggers = webhookData.data || [];
+          }
         }
+
+        // 合并触发器列表
+        webhooks.value = [
+          ...cronTriggers.map(trigger => ({
+            ...trigger,
+            type: 'cron',
+            url: `Cron: ${trigger.cronExpression}`,
+            workflowName: trigger.workflowId
+          })),
+          ...webhookTriggers.map(trigger => ({
+            ...trigger,
+            type: 'webhook'
+          }))
+        ];
       } catch (err) {
         console.error(err);
         alert('获取触发器列表失败: ' + err.message);
@@ -320,6 +404,42 @@ export default {
         workflows.value = data.workflows || [];
       } catch (err) {
         console.error(err);
+      }
+    }
+
+    // 创建 Cron 触发器
+    function createCronTrigger() {
+      newCronTrigger.value = {
+        workflowId: '',
+        cronExpression: ''
+      };
+      showCreateCronModal.value = true;
+    }
+
+    async function submitCreateCronTrigger() {
+      if (!newCronTrigger.value.workflowId || !newCronTrigger.value.cronExpression) {
+        alert('请填写必要信息');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/triggers/cron', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newCronTrigger.value)
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || '创建定时触发器失败');
+        }
+
+        alert('定时触发器创建成功');
+        closeCreateCronModal();
+        await fetchWebhooks();
+      } catch (err) {
+        console.error(err);
+        alert('创建定时触发器失败: ' + err.message);
       }
     }
 
@@ -453,6 +573,10 @@ export default {
       showCreateModal.value = false;
     }
 
+    function closeCreateCronModal() {
+      showCreateCronModal.value = false;
+    }
+
     function closeRequestsModal() {
       showRequestsModal.value = false;
       selectedWebhook.value = null;
@@ -480,6 +604,7 @@ export default {
       webhooks,
       workflows,
       showCreateModal,
+      showCreateCronModal,
       showRequestsModal,
       showRequestDetailModal,
       requestsLoading,
@@ -487,6 +612,9 @@ export default {
       selectedWebhook,
       selectedRequest,
       newWebhook,
+      newCronTrigger,
+      createCronTrigger,
+      submitCreateCronTrigger,
       createWebhook,
       submitCreateWebhook,
       toggleWebhook,
@@ -495,6 +623,7 @@ export default {
       viewRequests,
       viewRequestDetail,
       closeCreateModal,
+      closeCreateCronModal,
       closeRequestsModal,
       closeRequestDetailModal,
       formatDate
