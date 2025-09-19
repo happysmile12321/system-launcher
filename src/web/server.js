@@ -7,7 +7,7 @@ import { runDockerDeploy } from '../core/deployment.js';
 import { info, success, error, warning } from '../utils/logger.js';
 import GitFS from '../core/gitfs.js';
 import ScriptRunner from '../core/scriptRunner.js';
-import { startScheduler, stopScheduler } from '../services/schedulerService.js';
+import { startScheduler, stopScheduler, getSchedulerStatus, updateSchedulerConfig } from '../services/schedulerService.js';
 
 // --- Initial Setup ---
 const __filename = fileURLToPath(import.meta.url);
@@ -213,6 +213,41 @@ app.post('/api/scripts/:scriptName/run', async (req, res) => {
       error: 'Failed to run script.',
       logs: [`[ERROR] ${e.message}`] 
     });
+  }
+});
+
+// Scheduler APIs
+// Get scheduler status
+app.get('/api/scheduler/status', async (req, res) => {
+  try {
+    const status = getSchedulerStatus();
+    res.json({
+      message: 'Scheduler status retrieved successfully!',
+      status
+    });
+  } catch (e) {
+    error('Failed to get scheduler status: ' + e.message);
+    res.status(500).json({ error: 'Failed to get scheduler status.' });
+  }
+});
+
+// Update scheduler configuration
+app.post('/api/scheduler/update', async (req, res) => {
+  try {
+    const { cronExpression } = req.body;
+    if (!cronExpression) {
+      return res.status(400).json({ error: 'cronExpression is required.' });
+    }
+    
+    const updatedJob = await updateSchedulerConfig(cronExpression);
+    res.json({
+      message: 'Scheduler configuration updated successfully!',
+      nextRun: updatedJob.nextInvocation().toString(),
+      cronExpression
+    });
+  } catch (e) {
+    error('Failed to update scheduler configuration: ' + e.message);
+    res.status(500).json({ error: 'Failed to update scheduler configuration.' });
   }
 });
 

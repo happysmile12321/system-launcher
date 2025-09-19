@@ -2,6 +2,7 @@ import vm from 'vm';
 import { info, success, error } from '../utils/logger.js';
 import GitFS from './gitfs.js';
 import fetch from 'node-fetch';
+import * as vmModule from 'vm';
 
 /**
  * 脚本运行器 - 在安全的沙箱环境中执行用户自定义脚本
@@ -19,7 +20,7 @@ class ScriptRunner {
   createIsolatedEnvironment() {
     try {
       // 创建一个隔离的上下文对象
-      this.scriptContext = vm.createContext({
+      this.scriptContext = vmModule.createContext({
         // 空对象作为基础上下文，后续会注入SDK
       });
     } catch (err) {

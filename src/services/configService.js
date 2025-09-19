@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import * as fs from 'fs/promises';
+import * as fsPromises from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +11,7 @@ let config = null;
 
 export async function loadConfig() {
   try {
-    const fileContent = await fs.readFile(configPath, 'utf-8');
+    const fileContent = await fsPromises.readFile(configPath, 'utf-8');
     config = JSON.parse(fileContent);
     return config;
   } catch (error) {
@@ -24,7 +24,7 @@ export async function loadConfig() {
 }
 
 export async function saveConfig(newConfig) {
-  await fs.writeFile(configPath, JSON.stringify(newConfig, null, 2));
+  await fsPromises.writeFile(configPath, JSON.stringify(newConfig, null, 2));
   config = newConfig;
 }
 
