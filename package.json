@@ -12,7 +12,12 @@
     "start": "node src/web/server.js",
     "cli": "node src/cli/index.js"
   },
-  "keywords": ["cli", "web", "automation", "deploy"],
+  "keywords": [
+    "cli",
+    "web",
+    "automation",
+    "deploy"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -21,6 +26,8 @@
     "execa": "^8.0.1",
     "express": "^4.19.2",
     "inquirer": "^9.2.20",
+    "node-fetch": "^3.3.2",
+    "node-schedule": "^2.1.1",
     "octokit": "^3.2.1"
   }
 }

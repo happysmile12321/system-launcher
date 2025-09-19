@@ -1,43 +1,47 @@
-import { Octokit } from 'octokit';
-import 'dotenv/config';
+import GitFS from '../core/gitfs.js';
+import { info, error } from '../utils/logger.js';
 
-const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const owner = process.env.GITHUB_REPO_OWNER;
-const repo = process.env.GITHUB_REPO_NAME;
-const path = process.env.CONFIG_FILE_PATH;
-
-// Fetches the configuration file from GitHub.
-export async function getGitHubConfig() {
+/**
+ * 获取GitHub配置 - 使用GitFS抽象层
+ */
+export async function getGitHubConfig(config) {
   try {
-    const { data } = await octokit.rest.repos.getContent({ owner, repo, path });
-    const content = Buffer.from(data.content, 'base64').toString('utf-8');
-    return JSON.parse(content);
-  } catch (error) {
-    if (error.status === 404) {
-      // File not found, return a default structure
+    const gitfs = new GitFS(config);
+    // 默认使用配置文件路径或回退到默认路径
+    const configPath = config.configFilePath || 'config/main.json';
+    
+    const fileData = await gitfs.readFile(configPath);
+    if (fileData) {
+      return JSON.parse(fileData.content);
+    } else {
+      info(`Config file not found at ${configPath}, returning default config`);
       return { version: 1, steps: [] };
     }
-    throw error;
+  } catch (err) {
+    error(`Failed to get GitHub config: ${err.message}`);
+    throw err;
   }
 }
 
-// Saves the configuration file to GitHub.
-export async function saveGitHubConfig(configObject) {
-  let sha;
+/**
+ * 保存GitHub配置 - 使用GitFS抽象层
+ */
+export async function saveGitHubConfig(config, configObject) {
   try {
-    const { data } = await octokit.rest.repos.getContent({ owner, repo, path });
-    sha = data.sha;
-  } catch (error) {
-    // If file doesn't exist, sha will be undefined, which is fine for creation.
+    const gitfs = new GitFS(config);
+    // 默认使用配置文件路径或回退到默认路径
+    const configPath = config.configFilePath || 'config/main.json';
+    
+    // 确保配置目录存在
+    await gitfs.createDirectory('config');
+    
+    await gitfs.writeFile(
+      configPath, 
+      JSON.stringify(configObject, null, 2),
+      `chore: update orchestration config [${new Date().toISOString()}]`
+    );
+  } catch (err) {
+    error(`Failed to save GitHub config: ${err.message}`);
+    throw err;
   }
-
-  const content = Buffer.from(JSON.stringify(configObject, null, 2)).toString('base64');
-  await octokit.rest.repos.createOrUpdateFileContents({
-    owner,
-    repo,
-    path,
-    message: `chore: update orchestration config [${new Date().toISOString()}]`,
-    content,
-    sha,
-  });
 }

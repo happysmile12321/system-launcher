@@ -3,27 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orchestrator Pro</title>
+    <title>Dashboard - Orchestrator Pro</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Orchestrator Pro</h1>
-        <p>Deploy and manage your complex system via this web interface.</p>
+    <div class="dashboard-container">
+        <header class="header">
+            <h1>Orchestrator Pro</h1>
+        </header>
         
-        <div class="editor-container">
-            <textarea id="config-editor" placeholder="Configuration JSON will appear here..."></textarea>
+        <nav class="main-nav">
+            <ul>
+                <li><button id="nav-dashboard" class="nav-button active">Dashboard</button></li>
+                <li><button id="nav-scripts" class="nav-button">Scripts</button></li>
+            </ul>
+        </nav>
+        
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="content-section">
+                <div class="card">
+                    <h2>Orchestration Configuration</h2>
+                    <p class="subtitle">This JSON configuration is loaded from and saved to your private GitHub repository.</p>
+                    <textarea id="json-editor" rows="20"></textarea>
+                    <div class="card-actions">
+                        <button id="load-button" class="button-secondary">Load from GitHub</button>
+                        <button id="save-button" class="button-primary">Save to GitHub</button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Scripts Section -->
+            <section id="scripts-section" class="content-section hidden">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Scripts</h2>
+                        <button id="create-script-button" class="button-primary">Create New Script</button>
+                    </div>
+                    <div id="scripts-list">
+                        <!-- Scripts will be listed here -->
+                    </div>
+                </div>
+                
+                <!-- Script Editor -->
+                <div id="script-editor-container" class="card hidden">
+                    <div class="card-header">
+                        <h2 id="script-editor-title">Edit Script</h2>
+                        <button id="close-editor-button" class="button-secondary">Close</button>
+                    </div>
+                    <textarea id="script-editor" rows="20"></textarea>
+                    <div class="card-actions">
+                        <button id="save-script-button" class="button-primary">Save Script</button>
+                        <button id="run-script-button" class="button-secondary">Run Script</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <aside class="sidebar">
+            <div class="card">
+                <h2>Actions</h2>
+                <div class="button-group">
+                    <button id="deploy-docker-button" class="button-secondary">Run Docker Deploy</button>
+                </div>
+                <hr>
+                <h2>Status</h2>
+                <div id="status-container">
+                    <p id="status-message"></p>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Log Modal -->
+        <div id="log-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="log-modal-title">Script Execution Log</h2>
+                    <button id="close-log-modal" class="close-button">&times;</button>
+                </div>
+                <div id="log-content" class="log-content"></div>
+            </div>
         </div>
-        
-        <div class="button-group">
-            <button id="load-btn">Load from GitHub</button>
-            <button id="save-btn">Save to GitHub</button>
-            <button id="deploy-btn">Run Docker Deploy</button>
-        </div>
-        
-        <div id="status-message"></div>
     </div>
-    
     <script src="app.js"></script>
 </body>
 </html>
