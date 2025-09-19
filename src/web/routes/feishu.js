@@ -4,6 +4,9 @@ import { incrementCounter } from '../../services/metricsService.js';
 import feishuOAuthService from '../../services/feishuOAuthService.js';
 import feishuFS from '../../services/feishuFS.js';
 import { info, error, success } from '../../utils/logger.js';
+import { getConfig } from '../../services/configService.js';
+import GitFS from '../../core/gitfs.js';
+import feishuWebSocketService from '../../services/feishuWebSocketService.js';
 
 const router = express.Router();
 
@@ -20,6 +23,150 @@ router.get('/auth/status', async (req, res) => {
     });
   } catch (err) {
     error(`Failed to get Feishu auth status: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * 获取飞书配置状态
+ */
+router.get('/config/status', async (req, res) => {
+  try {
+    const config = await getConfig();
+    const hasConfig = !!(config.feishu?.appId && config.feishu?.appSecret);
+    
+    res.json({
+      success: true,
+      data: {
+        configured: hasConfig,
+        hasAppId: !!config.feishu?.appId,
+        hasAppSecret: !!config.feishu?.appSecret,
+        redirectUri: config.feishu?.redirectUri || 'http://localhost:3000/api/feishu/auth/callback'
+      }
+    });
+  } catch (err) {
+    error(`Failed to get Feishu config status: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * 保存飞书配置到GitFS
+ */
+router.post('/config', async (req, res) => {
+  try {
+    const { appId, appSecret, redirectUri } = req.body;
+    
+    if (!appId || !appSecret) {
+      return res.status(400).json({
+        success: false,
+        error: 'App ID和App Secret是必填项'
+      });
+    }
+    
+    const config = await getConfig();
+    const gitfs = new GitFS(config);
+    
+    // 更新配置
+    config.feishu = {
+      appId,
+      appSecret,
+      redirectUri: redirectUri || 'http://localhost:3000/api/feishu/auth/callback'
+    };
+    
+    // 确保.orchestrator-pro目录存在
+    await gitfs.createDirectory('.orchestrator-pro');
+    
+    // 保存配置到GitFS
+    await gitfs.writeFile(
+      '.orchestrator-pro/feishu-config.json',
+      JSON.stringify(config.feishu, null, 2),
+      'Update Feishu configuration'
+    );
+    
+    // 更新环境变量（用于当前会话）
+    process.env.FEISHU_APP_ID = appId;
+    process.env.FEISHU_APP_SECRET = appSecret;
+    process.env.FEISHU_REDIRECT_URI = config.feishu.redirectUri;
+    
+    success('Feishu configuration saved to GitFS');
+    
+    res.json({
+      success: true,
+      message: '飞书配置保存成功'
+    });
+  } catch (err) {
+    error(`Failed to save Feishu config: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * 获取飞书WebSocket连接状态
+ */
+router.get('/websocket/status', async (req, res) => {
+  try {
+    const status = feishuWebSocketService.getStatus();
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (err) {
+    error(`Failed to get Feishu WebSocket status: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * 启动飞书WebSocket连接
+ */
+router.post('/websocket/start', async (req, res) => {
+  try {
+    const started = await feishuWebSocketService.start();
+    if (started) {
+      res.json({
+        success: true,
+        message: '飞书WebSocket连接启动成功'
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: '飞书WebSocket连接启动失败，请检查配置'
+      });
+    }
+  } catch (err) {
+    error(`Failed to start Feishu WebSocket: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * 停止飞书WebSocket连接
+ */
+router.post('/websocket/stop', async (req, res) => {
+  try {
+    await feishuWebSocketService.stop();
+    res.json({
+      success: true,
+      message: '飞书WebSocket连接已停止'
+    });
+  } catch (err) {
+    error(`Failed to stop Feishu WebSocket: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message

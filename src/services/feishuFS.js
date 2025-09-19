@@ -1,5 +1,5 @@
 import { info, success, error, warning } from '../utils/logger.js';
-import feishuOAuthService from './feishuOAuthService.js';
+import { getConfig } from './configService.js';
 
 /**
  * FeishuFS - 飞书云盘文件系统服务
@@ -8,19 +8,70 @@ class FeishuFS {
   constructor() {
     this.baseUrl = 'https://open.feishu.cn/open-apis';
     this.driveToken = null;
+    this.appAccessToken = null;
+    this.appAccessTokenExpires = null;
   }
 
   /**
-   * 获取有效的访问令牌
+   * 获取应用级别的访问令牌
+   * @returns {string} - 应用访问令牌
+   */
+  async getAppAccessToken() {
+    try {
+      // 检查缓存的令牌是否仍然有效
+      if (this.appAccessToken && this.appAccessTokenExpires && new Date() < this.appAccessTokenExpires) {
+        return this.appAccessToken;
+      }
+
+      const config = await getConfig();
+      
+      if (!config.feishu?.appId || !config.feishu?.appSecret) {
+        throw new Error('Feishu App ID and App Secret are required');
+      }
+
+      info('Getting Feishu app access token');
+
+      const response = await fetch(`${this.baseUrl}/auth/v3/app_access_token/internal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          app_id: config.feishu.appId,
+          app_secret: config.feishu.appSecret
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Failed to get app access token: ${errorData.error_description || response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.code !== 0) {
+        throw new Error(`Feishu API error: ${data.msg}`);
+      }
+
+      // 缓存令牌
+      this.appAccessToken = data.app_access_token;
+      this.appAccessTokenExpires = new Date(Date.now() + (data.expire - 60) * 1000); // 提前1分钟过期
+
+      success('Successfully obtained Feishu app access token');
+      return this.appAccessToken;
+
+    } catch (err) {
+      error(`Failed to get app access token: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * 获取有效的访问令牌（兼容性方法）
    * @returns {string} - 访问令牌
    */
   async getAccessToken() {
-    try {
-      return await feishuOAuthService.getValidAccessToken();
-    } catch (err) {
-      error(`Failed to get Feishu access token: ${err.message}`);
-      throw new Error('Feishu authentication required. Please login first.');
-    }
+    return await this.getAppAccessToken();
   }
 
   /**

@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fsPromises from 'fs/promises';
 import crypto from 'crypto';
+import GitFS from '../core/gitfs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,7 +65,38 @@ export async function saveConfig(newConfig) {
   config = structuredConfig;
 }
 
-export function getConfig() {
+export async function getConfig() {
+  if (!config) {
+    await loadConfig();
+  }
+  
+  // 如果配置存在，尝试从GitFS读取飞书配置
+  if (config && config.github?.token) {
+    try {
+      const gitfs = new GitFS(config);
+      const feishuConfigFile = await gitfs.readFile('.orchestrator-pro/feishu-config.json');
+      
+      if (feishuConfigFile) {
+        const feishuConfig = JSON.parse(feishuConfigFile.content);
+        config.feishu = feishuConfig;
+        
+        // 更新环境变量
+        if (feishuConfig.appId) {
+          process.env.FEISHU_APP_ID = feishuConfig.appId;
+        }
+        if (feishuConfig.appSecret) {
+          process.env.FEISHU_APP_SECRET = feishuConfig.appSecret;
+        }
+        if (feishuConfig.redirectUri) {
+          process.env.FEISHU_REDIRECT_URI = feishuConfig.redirectUri;
+        }
+      }
+    } catch (err) {
+      // 如果读取GitFS配置失败，忽略错误，使用环境变量
+      console.warn('Failed to load Feishu config from GitFS:', err.message);
+    }
+  }
+  
   return config;
 }
 

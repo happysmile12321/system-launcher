@@ -18,6 +18,7 @@ import servicesRouter from './routes/services.js';
 import containersRouter from './routes/containers.js';
 import containerBackupRouter, { initializeContainerBackupService } from './routes/containerBackup.js';
 import aiCronRouter from './routes/aiCron.js';
+import feishuWebSocketService from '../services/feishuWebSocketService.js';
 import {
   listWorkflows,
   getWorkflow as getWorkflowById,
@@ -416,6 +417,18 @@ async function startServer() {
     info('容器备份服务初始化完成');
   } catch (backupServiceError) {
     warning(`容器备份服务初始化失败: ${backupServiceError.message}`);
+  }
+
+  // 启动飞书WebSocket服务
+  try {
+    const webSocketStarted = await feishuWebSocketService.start();
+    if (webSocketStarted) {
+      info('飞书WebSocket服务启动成功');
+    } else {
+      warning('飞书WebSocket服务启动失败，请检查飞书配置');
+    }
+  } catch (webSocketError) {
+    warning(`飞书WebSocket服务启动失败: ${webSocketError.message}`);
   }
     } catch (e) {
       warning(`Failed to initialize GitHub directories: ${e.message}`);

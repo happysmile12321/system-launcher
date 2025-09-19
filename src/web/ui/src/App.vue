@@ -602,46 +602,92 @@
       <template v-else-if="activeTab === 'database'">
         <div class="space-y-6">
           <!-- 飞书文件管理 -->
-          <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6">
+          <div 
+            :class="[
+              'rounded-2xl border backdrop-blur p-6 transition-all duration-300',
+              feishuConfigStatus.configured 
+                ? 'border-slate-800 bg-slate-900/60' 
+                : 'border-slate-700 bg-slate-900/30 opacity-60'
+            ]"
+          >
             <div class="flex items-center justify-between mb-6">
               <div>
                 <h2 class="text-lg font-semibold text-slate-100">飞书文件管理</h2>
                 <p class="text-sm text-slate-400 mt-1">管理飞书云盘中的文件和备份计划</p>
+                <div class="mt-2">
+                  <a 
+                    href="https://t1zosp7g1k7.feishu.cn/docx/QNN6dcEefohapsxmpMTcBnusnkf#share-WdW3dzZq2oHl8ix57GUcNLKun5g" 
+                    target="_blank" 
+                    class="text-xs text-sky-400 hover:text-sky-300 underline"
+                  >
+                    📖 查看飞书集成配置步骤
+                  </a>
+                </div>
+                <!-- WebSocket状态指示器 -->
+                <div class="flex items-center gap-2 mt-2">
+                  <div class="flex items-center gap-1">
+                    <div 
+                      :class="[
+                        'w-2 h-2 rounded-full',
+                        feishuWebSocketStatus.connected ? 'bg-green-500' : 'bg-red-500'
+                      ]"
+                    ></div>
+                    <span class="text-xs text-slate-400">
+                      WebSocket: {{ feishuWebSocketStatus.connected ? '已连接' : '未连接' }}
+                    </span>
+                  </div>
+                  <button
+                    v-if="!feishuWebSocketStatus.connected"
+                    @click="startFeishuWebSocket"
+                    :disabled="feishuWebSocketLoading || !feishuConfigStatus.configured"
+                    class="text-xs text-sky-400 hover:text-sky-300 underline disabled:opacity-50"
+                  >
+                    {{ feishuWebSocketLoading ? '启动中...' : '启动连接' }}
+                  </button>
+                  <button
+                    v-else
+                    @click="stopFeishuWebSocket"
+                    :disabled="feishuWebSocketLoading"
+                    class="text-xs text-amber-400 hover:text-amber-300 underline disabled:opacity-50"
+                  >
+                    {{ feishuWebSocketLoading ? '停止中...' : '停止连接' }}
+                  </button>
+                  <button
+                    v-if="!feishuWebSocketStatus.connected && feishuConfigStatus.configured"
+                    @click="openFeishuLongConnectionConfig"
+                    class="text-xs text-purple-400 hover:text-purple-300 underline"
+                  >
+                    🔗 配置长连接
+                  </button>
+                </div>
               </div>
               <div class="flex items-center gap-2">
                 <button
-                  class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/10"
+                  class="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-300 transition hover:bg-amber-500/10"
+                  @click="showFeishuConfigDialog = true"
+                  v-if="!feishuAuthStatus.authenticated"
+                >
+                  ⚙️ 配置飞书
+                </button>
+                <button
+                  class="rounded-lg border border-sky-500 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   @click="refreshFeishuFiles"
+                  :disabled="!feishuConfigStatus.configured"
                 >
                   刷新文件列表
                 </button>
                 <button
-                  class="rounded-lg border border-emerald-500 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10"
+                  class="rounded-lg border border-emerald-500 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   @click="createBackupPlan"
+                  :disabled="!feishuConfigStatus.configured"
                 >
                   创建备份计划
                 </button>
               </div>
             </div>
 
-            <!-- 飞书认证状态 -->
-            <div v-if="!feishuAuthStatus.authenticated" class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-6">
-              <div class="flex items-center gap-2">
-                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                </svg>
-                <span class="text-sm text-amber-200">需要先连接飞书账户才能管理文件</span>
-              </div>
-              <button
-                class="mt-3 rounded-lg border border-amber-500 px-3 py-1 text-xs font-medium text-amber-300 transition hover:bg-amber-500/10"
-                @click="connectFeishu"
-              >
-                连接飞书账户
-              </button>
-            </div>
-
             <!-- 文件列表 -->
-            <div v-else class="space-y-4">
+            <div class="space-y-4">
               <div v-if="feishuFilesLoading" class="flex items-center justify-center py-8">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
                 <span class="ml-2 text-sm text-slate-400">加载文件列表中...</span>
@@ -1135,6 +1181,137 @@
         </div>
       </div>
     </div>
+
+    <!-- 飞书配置对话框 -->
+    <div v-if="showFeishuConfigDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-slate-100">配置飞书集成</h3>
+          <p class="mt-1 text-sm text-slate-400">填写飞书应用的配置信息，这些信息将保存到GitFS中</p>
+        </div>
+
+        <form @submit.prevent="saveFeishuConfig" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">App ID</label>
+            <input
+              v-model="feishuConfigForm.appId"
+              type="text"
+              required
+              class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              placeholder="cli_xxxxxxxxxxxxxxxx"
+            />
+            <p class="mt-1 text-xs text-slate-400">
+              用于生成事件订阅页面链接：https://open.feishu.cn/app/{App ID}/event?tab=callback
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">App Secret</label>
+            <input
+              v-model="feishuConfigForm.appSecret"
+              type="password"
+              required
+              class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              placeholder="xxxxxxxxxxxxxxxxxxxx"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">重定向URI</label>
+            <input
+              v-model="feishuConfigForm.redirectUri"
+              type="url"
+              required
+              class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              placeholder="http://localhost:3000/api/feishu/auth/callback"
+            />
+          </div>
+
+          <div v-if="feishuConfigError" class="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2">
+            <p class="text-sm text-red-300">{{ feishuConfigError }}</p>
+          </div>
+
+          <div class="flex items-center gap-3 pt-4">
+            <button
+              type="button"
+              @click="showFeishuConfigDialog = false"
+              class="flex-1 rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
+              :disabled="feishuConfigLoading"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              class="flex-1 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:opacity-50"
+              :disabled="feishuConfigLoading"
+            >
+              <span v-if="feishuConfigLoading" class="flex items-center justify-center">
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                保存中...
+              </span>
+              <span v-else>保存配置</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 飞书配置激活对话框 -->
+    <div v-if="showFeishuActivationDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-slate-100">激活飞书配置</h3>
+          <p class="mt-1 text-sm text-slate-400">配置已保存成功！现在需要激活长连接回调功能</p>
+        </div>
+
+        <div class="space-y-4">
+          <div class="rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-3">
+            <div class="flex items-start gap-3">
+              <svg class="h-5 w-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+              </svg>
+              <div>
+                <h4 class="text-sm font-medium text-blue-300">配置步骤</h4>
+                <ul class="mt-2 text-sm text-blue-200 space-y-1">
+                  <li>1. 点击下方按钮打开飞书开放平台</li>
+                  <li>2. 在"事件订阅"页面启用长连接模式</li>
+                  <li>3. 确保已申请必要的权限</li>
+                  <li>4. 返回此页面启动WebSocket连接</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-600 bg-slate-800 px-4 py-3">
+            <div class="text-sm">
+              <div class="text-slate-300 mb-2">应用信息：</div>
+              <div class="space-y-1 text-slate-400">
+                <div>App ID: <span class="text-slate-200 font-mono">{{ savedFeishuConfig?.appId }}</span></div>
+                <div>重定向URI: <span class="text-slate-200 font-mono">{{ savedFeishuConfig?.redirectUri }}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 pt-6">
+          <button
+            @click="closeFeishuActivationDialog"
+            class="flex-1 rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
+          >
+            稍后配置
+          </button>
+          <button
+            @click="openFeishuEventSubscription"
+            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
+            🌐 打开飞书开放平台
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1176,10 +1353,31 @@ const showUserComponents = ref(true);
 
 // 数据库管理相关状态
 const feishuAuthStatus = ref({ authenticated: false, user: null });
+const feishuConfigStatus = ref({ configured: false, hasAppId: false, hasAppSecret: false });
 const feishuFiles = ref([]);
 const feishuFilesLoading = ref(false);
 const backupPlans = ref([]);
 const backupPlansLoading = ref(false);
+
+// 飞书配置相关
+const showFeishuConfigDialog = ref(false);
+const showFeishuActivationDialog = ref(false);
+const feishuConfigForm = ref({
+  appId: '',
+  appSecret: '',
+  redirectUri: 'http://localhost:3000/api/feishu/auth/callback'
+});
+const feishuConfigLoading = ref(false);
+const feishuConfigError = ref('');
+const savedFeishuConfig = ref(null);
+
+// 飞书WebSocket相关
+const feishuWebSocketStatus = ref({
+  connected: false,
+  reconnectAttempts: 0,
+  maxReconnectAttempts: 5
+});
+const feishuWebSocketLoading = ref(false);
 
 // 容器管理相关状态
 const containerServiceStatus = ref(null);
@@ -1680,44 +1878,209 @@ async function checkFeishuAuthStatus() {
   }
 }
 
-async function connectFeishu() {
+async function checkFeishuConfigStatus() {
   try {
-    const res = await fetch('/api/feishu/auth/start');
+    const res = await fetch('/api/feishu/config/status');
     if (res.ok) {
       const data = await res.json();
-      if (data.success && data.data.authUrl) {
-        // 打开新窗口进行OAuth认证
-        const authWindow = window.open(
-          data.data.authUrl,
-          'feishu_auth',
-          'width=600,height=700,scrollbars=yes,resizable=yes'
-        );
-        
-        // 监听窗口关闭事件
-        const checkClosed = setInterval(() => {
-          if (authWindow.closed) {
-            clearInterval(checkClosed);
-            // 重新检查认证状态
-            checkFeishuAuthStatus();
-          }
-        }, 1000);
-        
-        setStatus('info', '请在弹窗中完成飞书登录');
+      if (data.success) {
+        feishuConfigStatus.value = data.data;
+      }
+    }
+  } catch (err) {
+    console.error('获取飞书配置状态失败:', err);
+  }
+}
+
+async function connectFeishu() {
+  try {
+    // 显示长连接中状态
+    setStatus('info', '正在建立长连接...');
+    
+    // 首先尝试启动WebSocket连接
+    const webSocketStarted = await startFeishuWebSocket();
+    
+    if (webSocketStarted) {
+      setStatus('success', '长连接已建立，正在启动OAuth认证...');
+      
+      const res = await fetch('/api/feishu/auth/start');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data.authUrl) {
+          // 打开新窗口进行OAuth认证
+          const authWindow = window.open(
+            data.data.authUrl,
+            'feishu_auth',
+            'width=600,height=700,scrollbars=yes,resizable=yes'
+          );
+          
+          // 监听窗口关闭事件
+          const checkClosed = setInterval(() => {
+            if (authWindow.closed) {
+              clearInterval(checkClosed);
+              // 重新检查认证状态
+              checkFeishuAuthStatus();
+            }
+          }, 1000);
+          
+          setStatus('info', '请在弹窗中完成飞书登录');
+        } else {
+          setStatus('error', data.error || '启动飞书认证失败');
+        }
       } else {
-        setStatus('error', data.error || '启动飞书认证失败');
+        setStatus('error', '启动飞书认证失败');
       }
     } else {
-      setStatus('error', '启动飞书认证失败');
+      setStatus('error', '长连接建立失败，请检查飞书配置');
     }
   } catch (err) {
     console.error('启动飞书认证失败:', err);
-    setStatus('error', '启动飞书认证失败');
+    setStatus('error', '启动飞书认证失败: ' + err.message);
+  }
+}
+
+async function saveFeishuConfig() {
+  feishuConfigLoading.value = true;
+  feishuConfigError.value = '';
+  
+  try {
+    const res = await fetch('/api/feishu/config', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(feishuConfigForm.value)
+    });
+    
+    const data = await res.json();
+    
+    if (res.ok && data.success) {
+      setStatus('success', '飞书配置保存成功！');
+      showFeishuConfigDialog.value = false;
+      
+      // 保存配置信息用于激活对话框
+      savedFeishuConfig.value = { ...feishuConfigForm.value };
+      
+      // 显示激活配置对话框
+      showFeishuActivationDialog.value = true;
+      
+      // 重新检查认证状态
+      await checkFeishuAuthStatus();
+    } else {
+      feishuConfigError.value = data.error || '保存配置失败';
+    }
+  } catch (err) {
+    console.error('保存飞书配置失败:', err);
+    feishuConfigError.value = '保存配置失败: ' + err.message;
+  } finally {
+    feishuConfigLoading.value = false;
+  }
+}
+
+function openFeishuEventSubscription() {
+  if (savedFeishuConfig.value?.appId) {
+    const eventUrl = `https://open.feishu.cn/app/${savedFeishuConfig.value.appId}/event?tab=callback`;
+    window.open(eventUrl, '_blank');
+    setStatus('info', '已打开飞书开放平台事件订阅页面，请配置长连接回调');
+  }
+}
+
+function closeFeishuActivationDialog() {
+  showFeishuActivationDialog.value = false;
+  savedFeishuConfig.value = null;
+}
+
+async function checkFeishuWebSocketStatus() {
+  try {
+    const res = await fetch('/api/feishu/websocket/status');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        feishuWebSocketStatus.value = data.data;
+      }
+    }
+  } catch (err) {
+    console.error('获取飞书WebSocket状态失败:', err);
+  }
+}
+
+async function startFeishuWebSocket() {
+  feishuWebSocketLoading.value = true;
+  try {
+    const res = await fetch('/api/feishu/websocket/start', {
+      method: 'POST'
+    });
+    
+    const data = await res.json();
+    
+    if (res.ok && data.success) {
+      setStatus('success', '飞书WebSocket长连接启动成功');
+      await checkFeishuWebSocketStatus();
+      
+      // 连接成功后自动刷新文件列表
+      await refreshFeishuFiles();
+      return true;
+    } else {
+      setStatus('error', data.error || '启动WebSocket连接失败');
+      return false;
+    }
+  } catch (err) {
+    console.error('启动飞书WebSocket失败:', err);
+    setStatus('error', '启动WebSocket连接失败: ' + err.message);
+    return false;
+  } finally {
+    feishuWebSocketLoading.value = false;
+  }
+}
+
+async function stopFeishuWebSocket() {
+  feishuWebSocketLoading.value = true;
+  try {
+    const res = await fetch('/api/feishu/websocket/stop', {
+      method: 'POST'
+    });
+    
+    const data = await res.json();
+    
+    if (res.ok && data.success) {
+      setStatus('success', '飞书WebSocket连接已停止');
+      await checkFeishuWebSocketStatus();
+    } else {
+      setStatus('error', data.error || '停止WebSocket连接失败');
+    }
+  } catch (err) {
+    console.error('停止飞书WebSocket失败:', err);
+    setStatus('error', '停止WebSocket连接失败: ' + err.message);
+  } finally {
+    feishuWebSocketLoading.value = false;
+  }
+}
+
+async function openFeishuLongConnectionConfig() {
+  try {
+    // 获取飞书配置状态
+    const res = await fetch('/api/feishu/config/status');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data.hasAppId) {
+        const eventUrl = `https://open.feishu.cn/app/${data.data.appId}/event?tab=callback`;
+        window.open(eventUrl, '_blank');
+        setStatus('info', '已打开飞书开放平台长连接配置页面');
+      } else {
+        setStatus('error', '请先配置飞书App ID');
+      }
+    } else {
+      setStatus('error', '获取飞书配置状态失败');
+    }
+  } catch (err) {
+    console.error('打开飞书长连接配置失败:', err);
+    setStatus('error', '打开飞书长连接配置失败');
   }
 }
 
 async function refreshFeishuFiles() {
-  if (!feishuAuthStatus.value.authenticated) {
-    setStatus('error', '请先连接飞书账户');
+  if (!feishuConfigStatus.value.configured) {
+    setStatus('error', '请先配置飞书应用');
     return;
   }
 
@@ -2281,6 +2644,8 @@ onMounted(() => {
   fetchScripts();
   fetchComponents();
   checkFeishuAuthStatus();
+  checkFeishuConfigStatus();
+  checkFeishuWebSocketStatus();
   refreshBackupPlans();
   loadBackupWorkflows();
   loadCronSuggestions();
