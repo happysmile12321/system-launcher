@@ -11,6 +11,7 @@ import ScriptRunner from '../core/scriptRunner.js';
 import { startScheduler, stopScheduler, getSchedulerStatus, updateSchedulerConfig } from '../services/schedulerService.js';
 import feishuWebhookRouter from './routes/feishu.js';
 import managementApiRouter from './routes/management.js';
+import componentsRouter from './routes/components.js';
 import {
   listWorkflows,
   getWorkflow as getWorkflowById,
@@ -329,10 +330,13 @@ app.post('/api/scheduler/update', async (req, res) => {
 });
 
 // Feishu Webhook Route
-app.use('/api/feishu-webhooks', feishuWebhookRouter);
+app.use('/api/feishu', feishuWebhookRouter);
 
 // Management API Route
 app.use('/api/management', managementApiRouter);
+
+// Components API Route
+app.use('/api/components', componentsRouter);
 
 
 // --- Server Startup ---

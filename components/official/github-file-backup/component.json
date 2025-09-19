@@ -1,0 +1,51 @@
+{
+  "name": "github-file-backup",
+  "displayName": "GitHub文件备份",
+  "description": "备份GitHub仓库中的文件到指定目录，并自动添加时间戳后缀。",
+  "version": "1.0.0",
+  "inputs": [
+    {
+      "id": "sourceFilePath",
+      "label": "源文件路径",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "targetDirPath",
+      "label": "目标目录路径",
+      "type": "string",
+      "required": true
+    },
+    {
+      "id": "includeTimestamp",
+      "label": "包含时间戳",
+      "type": "boolean",
+      "required": false,
+      "default": true
+    },
+    {
+      "id": "timestampFormat",
+      "label": "时间戳格式",
+      "type": "string",
+      "required": false,
+      "default": "YYYYMMDD_HHmmss"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "isSuccess",
+      "label": "是否备份成功",
+      "type": "boolean"
+    },
+    {
+      "id": "backupFilePath",
+      "label": "备份文件路径",
+      "type": "string"
+    },
+    {
+      "id": "fileSize",
+      "label": "文件大小（字节）",
+      "type": "number"
+    }
+  ]
+}

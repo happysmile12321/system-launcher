@@ -1,19 +1,54 @@
 <template>
   <div class="min-h-screen bg-slate-950 text-slate-100">
     <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur">
-      <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <div>
-          <p class="text-sm uppercase tracking-[0.3em] text-sky-400">Orchestrator Pro</p>
-          <h1 class="mt-1 text-2xl font-semibold">可视化工作流设计器</h1>
+      <div class="mx-auto max-w-7xl px-6 py-4">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <p class="text-sm uppercase tracking-[0.3em] text-sky-400">Orchestrator Pro</p>
+            <h1 class="mt-1 text-2xl font-semibold">可视化工作流设计器</h1>
+          </div>
+          <div class="text-right text-xs text-slate-400">
+            <p>UI 2.0 · 阶段一</p>
+            <p class="opacity-70">结构化配置 &amp; 核心骨架</p>
+          </div>
         </div>
-        <div class="text-right text-xs text-slate-400">
-          <p>UI 2.0 · 阶段一</p>
-          <p class="opacity-70">结构化配置 &amp; 核心骨架</p>
-        </div>
+        <nav class="flex space-x-1">
+          <button 
+            class="rounded-lg px-4 py-2 text-sm font-medium transition" 
+            :class="activeTab === 'workflows' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
+            @click="activeTab = 'workflows'"
+          >
+            工作流
+          </button>
+          <button 
+            class="rounded-lg px-4 py-2 text-sm font-medium transition" 
+            :class="activeTab === 'components' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
+            @click="activeTab = 'components'"
+          >
+            组件
+          </button>
+          <button 
+            class="rounded-lg px-4 py-2 text-sm font-medium transition" 
+            :class="activeTab === 'triggers' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
+            @click="activeTab = 'triggers'"
+          >
+            触发器
+          </button>
+          <button 
+            class="rounded-lg px-4 py-2 text-sm font-medium transition" 
+            :class="activeTab === 'settings' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
+            @click="activeTab = 'settings'"
+          >
+            设置
+          </button>
+        </nav>
       </div>
     </header>
 
-    <main class="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[22rem_1.8fr_18rem]">
+    <main class="mx-auto max-w-7xl px-6 py-8">
+      <!-- 工作流页面 -->
+      <template v-if="activeTab === 'workflows'">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_1.8fr_18rem]">
       <!-- Workflow list + metadata -->
       <section class="flex h-full flex-col gap-4">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur">
@@ -308,12 +343,46 @@
           </div>
         </div>
       </aside>
+        </div>
+      </template>
+
+      <!-- 组件页面 -->
+      <template v-else-if="activeTab === 'components'">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur">
+          <ComponentManager />
+        </div>
+      </template>
+
+      <!-- 触发器页面 (占位) -->
+      <template v-else-if="activeTab === 'triggers'">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-10 text-center backdrop-blur">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <h3 class="mt-6 text-lg font-medium text-slate-300">触发器管理</h3>
+          <p class="mt-2 text-slate-500">触发器功能正在开发中...</p>
+        </div>
+      </template>
+
+      <!-- 设置页面 (占位) -->
+      <template v-else-if="activeTab === 'settings'">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-10 text-center backdrop-blur">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <h3 class="mt-6 text-lg font-medium text-slate-300">系统设置</h3>
+          <p class="mt-2 text-slate-500">设置功能正在开发中...</p>
+        </div>
+      </template>
     </main>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
+import ComponentManager from './components/ComponentManager.vue';
 
 const workflows = ref([]);
 const selectedWorkflowId = ref('');
@@ -329,6 +398,9 @@ const loadingStates = reactive({
 });
 
 const statusMessage = reactive({ type: '', text: '' });
+
+// 当前选中的导航项
+const activeTab = ref('workflows');
 
 const statusClasses = computed(() => {
   if (statusMessage.type === 'error') {
