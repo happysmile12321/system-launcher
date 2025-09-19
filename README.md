@@ -7,7 +7,7 @@ This tool helps deploy and manage my complex system via both a CLI and a Web UI.
 1.  Clone the repository.
 2.  Run `npm install`.
 3.  Create a `.env` file from the example and fill in your GitHub details.
-4.  For detailed operational guides, please see our [Feishu Documentation](https://t1zosp7g1k7.feishu.cn/docx/QNN6dcEefohapsxmpMTcBnusnkf?from=from_copylink).
+4.  For detailed operational guides, please see our [Feishu Documentation](https://t1zosp7g1k7.feishu.cn/docx/QNN6dcEefohapsxmpMTcBnusnkf?from=from_copylink)
 
 ## Usage
 
