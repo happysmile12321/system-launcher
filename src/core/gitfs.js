@@ -14,10 +14,10 @@ class GitFS {
   }
 
   initializeOctokit() {
-    if (!this.config || !this.config.githubToken) {
+    if (!this.config || !this.config.github || !this.config.github.token) {
       throw new Error('GitHub token is not configured.');
     }
-    this.octokit = new Octokit({ auth: this.config.githubToken });
+    this.octokit = new Octokit({ auth: this.config.github.token });
   }
 
   /**
@@ -39,8 +39,8 @@ class GitFS {
       info(`Listing directory: ${fullPath}`);
       
       const { data } = await this.octokit.rest.repos.getContent({
-        owner: this.config.githubRepoOwner,
-        repo: this.config.githubRepoName,
+        owner: this.config.github.owner,
+        repo: this.config.github.repo,
         path: fullPath
       });
 
@@ -76,8 +76,8 @@ class GitFS {
       info(`Reading file: ${fullPath}`);
       
       const { data } = await this.octokit.rest.repos.getContent({
-        owner: this.config.githubRepoOwner,
-        repo: this.config.githubRepoName,
+        owner: this.config.github.owner,
+        repo: this.config.github.repo,
         path: fullPath
       });
 
@@ -113,8 +113,8 @@ class GitFS {
       let sha = null;
       try {
         const fileData = await this.octokit.rest.repos.getContent({
-          owner: this.config.githubRepoOwner,
-          repo: this.config.githubRepoName,
+          owner: this.config.github.owner,
+          repo: this.config.github.repo,
           path: fullPath
         });
         sha = fileData.data.sha;
@@ -125,8 +125,8 @@ class GitFS {
       const encodedContent = Buffer.from(content).toString('base64');
       
       await this.octokit.rest.repos.createOrUpdateFileContents({
-        owner: this.config.githubRepoOwner,
-        repo: this.config.githubRepoName,
+        owner: this.config.github.owner,
+        repo: this.config.github.repo,
         path: fullPath,
         message,
         content: encodedContent,
@@ -150,14 +150,14 @@ class GitFS {
       
       // 获取文件的sha
       const fileData = await this.octokit.rest.repos.getContent({
-        owner: this.config.githubRepoOwner,
-        repo: this.config.githubRepoName,
+        owner: this.config.github.owner,
+        repo: this.config.github.repo,
         path: fullPath
       });
       
       await this.octokit.rest.repos.deleteFile({
-        owner: this.config.githubRepoOwner,
-        repo: this.config.githubRepoName,
+        owner: this.config.github.owner,
+        repo: this.config.github.repo,
         path: fullPath,
         message,
         sha: fileData.data.sha
@@ -185,8 +185,8 @@ class GitFS {
       let sha = null;
       try {
         const fileData = await this.octokit.rest.repos.getContent({
-          owner: this.config.githubRepoOwner,
-          repo: this.config.githubRepoName,
+          owner: this.config.github.owner,
+          repo: this.config.github.repo,
           path: placeholderPath
         });
         sha = fileData.data.sha;
@@ -195,8 +195,8 @@ class GitFS {
       }
       
       await this.octokit.rest.repos.createOrUpdateFileContents({
-        owner: this.config.githubRepoOwner,
-        repo: this.config.githubRepoName,
+        owner: this.config.github.owner,
+        repo: this.config.github.repo,
         path: placeholderPath,
         message,
         content: Buffer.from('').toString('base64'),
@@ -217,8 +217,8 @@ class GitFS {
     try {
       const fullPath = this.getFullPath(path);
       await this.octokit.rest.repos.getContent({
-        owner: this.config.githubRepoOwner,
-        repo: this.config.githubRepoName,
+        owner: this.config.github.owner,
+        repo: this.config.github.repo,
         path: fullPath
       });
       return true;

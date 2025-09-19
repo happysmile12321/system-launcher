@@ -59,7 +59,7 @@ async function checkAndSyncConfig() {
     }
 
     try {
-      const gitfs = new GitFS(latestConfig.github);
+      const gitfs = new GitFS(latestConfig);
       
       const localConfigContent = JSON.stringify(latestConfig, null, 2);
       const gitConfigPath = latestConfig.github.configFile || 'config/system.json';
@@ -67,7 +67,11 @@ async function checkAndSyncConfig() {
       const gitConfigData = await gitfs.readFile(gitConfigPath);
       
       if (!gitConfigData || gitConfigData.content !== localConfigContent) {
-        await gitfs.createDirectory(gitConfigPath.substring(0, gitConfigPath.lastIndexOf('/')));
+        // 只在gitConfigPath包含路径分隔符时创建目录
+        const pathSeparatorIndex = gitConfigPath.lastIndexOf('/');
+        if (pathSeparatorIndex > 0) {
+          await gitfs.createDirectory(gitConfigPath.substring(0, pathSeparatorIndex));
+        }
         
         await gitfs.writeFile(
           gitConfigPath,
