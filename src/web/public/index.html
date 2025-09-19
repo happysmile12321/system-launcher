@@ -4,84 +4,99 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Orchestrator Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div class="dashboard-container">
-        <header class="header">
-            <h1>Orchestrator Pro</h1>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <div class="dashboard-container mx-auto px-4 py-8 flex-grow flex flex-col">
+        <header class="header mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Orchestrator Pro</h1>
+            <p class="text-gray-600">Configure and automate your system orchestration</p>
         </header>
         
-        <nav class="main-nav">
-            <ul>
-                <li><button id="nav-dashboard" class="nav-button active">Dashboard</button></li>
-                <li><button id="nav-scripts" class="nav-button">Scripts</button></li>
+        <nav class="main-nav mb-8">
+            <ul class="flex justify-center space-x-4">
+                <li><button id="nav-dashboard" class="nav-button active px-5 py-3 rounded-lg bg-blue-600 text-white font-medium cursor-pointer transition-all duration-200 hover:bg-blue-700">Dashboard</button></li>
+                <li><button id="nav-scripts" class="nav-button px-5 py-3 rounded-lg bg-gray-200 text-gray-700 font-medium cursor-pointer transition-all duration-200 hover:bg-gray-300">Scripts</button></li>
             </ul>
         </nav>
         
-        <main class="main-content">
-            <!-- Dashboard Section -->
-            <section id="dashboard-section" class="content-section">
-                <div class="card">
-                    <h2>Orchestration Configuration</h2>
-                    <p class="subtitle">This JSON configuration is loaded from and saved to your private GitHub repository.</p>
-                    <textarea id="json-editor" rows="20"></textarea>
-                    <div class="card-actions">
-                        <button id="load-button" class="button-secondary">Load from GitHub</button>
-                        <button id="save-button" class="button-primary">Save to GitHub</button>
+        <div class="flex flex-col lg:flex-row gap-8">
+            <main class="main-content flex-grow">
+                <!-- Dashboard Section -->
+                <section id="dashboard-section" class="content-section bg-white rounded-xl shadow-md p-6">
+                    <div class="card">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Orchestration Configuration</h2>
+                        <p class="subtitle text-gray-600 mb-4">This JSON configuration is loaded from and saved to your private GitHub repository.</p>
+                        <textarea id="json-editor" rows="20" class="w-full h-80 p-4 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                        <div class="card-actions flex flex-wrap gap-4 mt-4">
+                            <button id="load-button" class="button-secondary px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-all duration-200 flex items-center gap-2">
+                                <i class="fa fa-download"></i> Load from GitHub
+                            </button>
+                            <button id="save-button" class="button-primary px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition-all duration-200 flex items-center gap-2">
+                                <i class="fa fa-save"></i> Save to GitHub
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </section>
-            
-            <!-- Scripts Section -->
-            <section id="scripts-section" class="content-section hidden">
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Scripts</h2>
-                        <button id="create-script-button" class="button-primary">Create New Script</button>
-                    </div>
-                    <div id="scripts-list">
-                        <!-- Scripts will be listed here -->
-                    </div>
-                </div>
+                </section>
                 
-                <!-- Script Editor -->
-                <div id="script-editor-container" class="card hidden">
-                    <div class="card-header">
-                        <h2 id="script-editor-title">Edit Script</h2>
-                        <button id="close-editor-button" class="button-secondary">Close</button>
+                <!-- Scripts Section -->
+                <section id="scripts-section" class="content-section hidden bg-white rounded-xl shadow-md p-6">
+                    <div class="card">
+                        <div class="card-header flex flex-wrap justify-between items-center gap-4 mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800">Scripts</h2>
+                            <button id="create-script-button" class="button-primary px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-all duration-200 flex items-center gap-2">
+                                <i class="fa fa-plus"></i> Create New Script
+                            </button>
+                        </div>
+                        <div id="scripts-list">
+                            <!-- Scripts will be listed here -->
+                        </div>
                     </div>
-                    <textarea id="script-editor" rows="20"></textarea>
-                    <div class="card-actions">
-                        <button id="save-script-button" class="button-primary">Save Script</button>
-                        <button id="run-script-button" class="button-secondary">Run Script</button>
+                </section>
+            </main>
+            
+            <aside class="sidebar w-full lg:w-64">
+                <div class="card bg-white rounded-xl shadow-md p-6 sticky top-4">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">Actions</h2>
+                    <div class="button-group">
+                        <button id="deploy-docker-button" class="button-secondary w-full px-6 py-3 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700 transition-all duration-200 flex items-center justify-center gap-2">
+                            <i class="fa fa-cubes"></i> Run Docker Deploy
+                        </button>
+                    </div>
+                    <hr class="my-4 border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">Status</h2>
+                    <div id="status-container">
+                        <p id="status-message" class="text-gray-600"></p>
                     </div>
                 </div>
-            </section>
-        </main>
+            </aside>
+        </div>
         
-        <aside class="sidebar">
-            <div class="card">
-                <h2>Actions</h2>
-                <div class="button-group">
-                    <button id="deploy-docker-button" class="button-secondary">Run Docker Deploy</button>
+        <!-- Script Editor Modal -->
+        <div id="script-editor-container" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="modal-content bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div class="modal-header flex justify-between items-center p-4 border-b border-gray-200">
+                    <h2 id="script-editor-title" class="text-xl font-semibold text-gray-800">Edit Script</h2>
+                    <button id="close-editor-button" class="button-secondary text-gray-500 hover:text-gray-700 text-2xl focus:outline-none">&times;</button>
                 </div>
-                <hr>
-                <h2>Status</h2>
-                <div id="status-container">
-                    <p id="status-message"></p>
+                <textarea id="script-editor" rows="20" class="w-full h-full min-h-[50vh] p-4 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                <div class="card-actions flex justify-end p-4 border-t border-gray-200 space-x-3">
+                    <button id="save-script-button" class="button-primary px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-all duration-200">Save Script</button>
+                    <button id="run-script-button" class="button-secondary px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition-all duration-200">Run Script</button>
                 </div>
             </div>
-        </aside>
+        </div>
         
         <!-- Log Modal -->
-        <div id="log-modal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 id="log-modal-title">Script Execution Log</h2>
-                    <button id="close-log-modal" class="close-button">&times;</button>
+        <div id="log-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="modal-content bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div class="modal-header flex justify-between items-center p-4 border-b border-gray-200">
+                    <h2 id="log-modal-title" class="text-xl font-semibold text-gray-800">Script Execution Log</h2>
+                    <button id="close-log-modal" class="close-button text-gray-500 hover:text-gray-700 text-2xl focus:outline-none">&times;</button>
                 </div>
-                <div id="log-content" class="log-content"></div>
+                <div id="log-content" class="log-content flex-grow p-4 overflow-auto"></div>
             </div>
         </div>
     </div>

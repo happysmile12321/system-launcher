@@ -1,5 +1,6 @@
-import { Octokit } from 'octokit';
+
 import { info, success, error } from '../utils/logger.js';
+import { Octokit } from 'octokit';
 
 /**
  * GitFS - 抽象层，用于模拟文件系统操作，将所有对GitHub的API调用进行封装
@@ -180,12 +181,26 @@ class GitFS {
       // GitHub 通过文件路径隐式创建目录，所以我们创建一个占位文件
       const placeholderPath = `${fullPath}/.gitkeep`;
       
+      // 检查文件是否存在以获取SHA
+      let sha = null;
+      try {
+        const fileData = await this.octokit.rest.repos.getContent({
+          owner: this.config.githubRepoOwner,
+          repo: this.config.githubRepoName,
+          path: placeholderPath
+        });
+        sha = fileData.data.sha;
+      } catch (err) {
+        // 文件不存在，继续创建
+      }
+      
       await this.octokit.rest.repos.createOrUpdateFileContents({
         owner: this.config.githubRepoOwner,
         repo: this.config.githubRepoName,
         path: placeholderPath,
         message,
-        content: Buffer.from('').toString('base64')
+        content: Buffer.from('').toString('base64'),
+        sha
       });
 
       success(`Successfully created directory: ${fullPath}`);

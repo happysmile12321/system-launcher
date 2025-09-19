@@ -31,15 +31,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Current state
     let currentScriptName = null;
     
-    // Display status message with appropriate styling
+    // Display status message with Tailwind CSS styling
     function showStatus(message, type = 'info') {
         statusMessage.textContent = message;
-        statusMessage.className = type;
+        statusMessage.classList.remove('hidden', 'bg-green-100', 'bg-red-100', 'bg-blue-100', 'text-green-800', 'text-red-800', 'text-blue-800', 'border', 'border-green-200', 'border-red-200', 'border-blue-200');
+        
+        // Apply appropriate Tailwind classes based on message type
+        statusMessage.classList.add('p-4', 'rounded-lg', 'shadow-lg', 'max-w-sm', 'transform', 'transition-all', 'duration-300', 'translate-y-0');
+        
+        if (type === 'success') {
+            statusMessage.classList.add('bg-green-100', 'text-green-800', 'border', 'border-green-200');
+        } else if (type === 'error') {
+            statusMessage.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-200');
+        } else {
+            statusMessage.classList.add('bg-blue-100', 'text-blue-800', 'border', 'border-blue-200');
+        }
         
         // Clear message after 5 seconds
         setTimeout(() => {
-            statusMessage.textContent = '';
-            statusMessage.className = '';
+            statusMessage.classList.add('hidden');
         }, 5000);
     }
     
