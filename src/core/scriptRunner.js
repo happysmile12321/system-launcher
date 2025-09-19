@@ -3,6 +3,10 @@ import { info, success, error } from '../utils/logger.js';
 import GitFS from './gitfs.js';
 import fetch from 'node-fetch';
 import * as vmModule from 'vm';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 /**
  * 脚本运行器 - 在安全的沙箱环境中执行用户自定义脚本
@@ -249,6 +253,34 @@ class ScriptRunner {
         logs: [`[ERROR] Failed to run script from path: ${err.message}`]
       };
     }
+  }
+}
+
+/**
+ * 执行shell命令的辅助函数
+ * @param {string} command - 要执行的shell命令
+ * @param {Object} options - 执行选项
+ * @returns {Promise<Object>} - 执行结果
+ */
+export async function runShellCommand(command, options = {}) {
+  try {
+    const { stdout, stderr } = await execAsync(command, {
+      timeout: options.timeout || 30000, // 默认30秒超时
+      ...options
+    });
+    
+    return {
+      stdout: stdout.trim(),
+      stderr: stderr.trim(),
+      success: true
+    };
+  } catch (err) {
+    return {
+      stdout: '',
+      stderr: err.message,
+      success: false,
+      error: err.message
+    };
   }
 }
 
