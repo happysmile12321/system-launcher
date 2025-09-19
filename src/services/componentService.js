@@ -376,7 +376,25 @@ class ComponentService {
     await this.initialize();
     
     const componentsMap = componentType === 'official' ? this.officialComponents : this.userComponents;
-    return componentsMap.get(componentName) || null;
+    const component = componentsMap.get(componentName);
+    
+    if (!component) {
+      return null;
+    }
+
+    // 获取组件代码
+    const componentKey = `${componentType}:${componentName}`;
+    const componentCache = this.componentCache.get(componentKey);
+    
+    if (componentCache) {
+      return {
+        ...component,
+        manifest: componentCache.manifest,
+        code: componentCache.code
+      };
+    }
+    
+    return component;
   }
 
   /**

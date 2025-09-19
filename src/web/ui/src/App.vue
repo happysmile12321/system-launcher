@@ -348,32 +348,127 @@
 
       <!-- 组件页面 -->
       <template v-else-if="activeTab === 'components'">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur">
-          <ComponentManager />
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_1fr]">
+          <!-- 左侧：组件列表 -->
+          <section class="flex h-full flex-col gap-4">
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur">
+              <div class="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-300">组件列表</h2>
+                <button
+                  class="rounded-lg border border-sky-500 px-3 py-1 text-xs font-medium text-sky-300 transition hover:bg-sky-500/10"
+                  @click="handleCreateComponent"
+                >
+                  + 新建组件
+                </button>
+              </div>
+              <div class="max-h-[20rem] overflow-y-auto px-2 py-2 scrollbar-hide">
+                <!-- 系统组件区域 -->
+                <div class="mb-4">
+                  <button
+                    class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-300 hover:bg-slate-800/40"
+                    @click="toggleSystemComponents"
+                  >
+                    <span>系统组件</span>
+                    <svg
+                      class="h-4 w-4 transition-transform"
+                      :class="showSystemComponents ? 'rotate-90' : ''"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                  </button>
+                  <div v-if="showSystemComponents" class="ml-4 space-y-1">
+                    <button
+                      v-for="component in systemComponents"
+                      :key="`system-${component.name}`"
+                      class="group flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition"
+                      :class="selectedComponentId === `system-${component.name}` ? 'bg-sky-500/10 border border-sky-500/40' : 'border border-transparent hover:border-slate-700 hover:bg-slate-800/40'"
+                      @click="selectComponent(`system-${component.name}`, component)"
+                    >
+                      <span class="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-blue-400"></span>
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-slate-100">{{ component.displayName || component.name }}</p>
+                        <p class="mt-1 line-clamp-1 text-xs text-slate-400">{{ component.description || '系统组件' }}</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 我的组件区域 -->
+                <div>
+                  <button
+                    class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-300 hover:bg-slate-800/40"
+                    @click="toggleUserComponents"
+                  >
+                    <span>我的组件</span>
+                    <svg
+                      class="h-4 w-4 transition-transform"
+                      :class="showUserComponents ? 'rotate-90' : ''"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                  </button>
+                  <div v-if="showUserComponents" class="ml-4 space-y-1">
+                    <button
+                      v-for="component in userComponents"
+                      :key="`user-${component.name}`"
+                      class="group flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition"
+                      :class="selectedComponentId === `user-${component.name}` ? 'bg-sky-500/10 border border-sky-500/40' : 'border border-transparent hover:border-slate-700 hover:bg-slate-800/40'"
+                      @click="selectComponent(`user-${component.name}`, component)"
+                    >
+                      <span class="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400"></span>
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-slate-100">{{ component.displayName || component.name }}</p>
+                        <p class="mt-1 line-clamp-1 text-xs text-slate-400">{{ component.description || '用户组件' }}</p>
+                      </div>
+                    </button>
+                    <p v-if="!userComponents.length" class="px-3 py-4 text-xs text-slate-500">还没有自定义组件，点击右上角"新建组件"开始吧。</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 右侧：组件内容展示区 -->
+          <section class="flex flex-col gap-4">
+            <div class="flex-1 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur">
+              <div v-if="!currentComponent" class="flex h-full items-center justify-center">
+                <div class="text-center">
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                    <polyline points="14,2 14,8 20,8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10,9 9,9 8,9"></polyline>
+                  </svg>
+                  <h3 class="mt-6 text-lg font-medium text-slate-300">选择组件</h3>
+                  <p class="mt-2 text-slate-500">从左侧列表中选择一个组件来查看或编辑</p>
+                </div>
+              </div>
+              <div v-else class="h-full">
+                <ComponentManager :selected-component="currentComponent" :component-type="currentComponentType" />
+              </div>
+            </div>
+          </section>
         </div>
       </template>
 
-      <!-- 触发器页面 (占位) -->
+      <!-- 触发器页面 -->
       <template v-else-if="activeTab === 'triggers'">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-10 text-center backdrop-blur">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          <h3 class="mt-6 text-lg font-medium text-slate-300">触发器管理</h3>
-          <p class="mt-2 text-slate-500">触发器功能正在开发中...</p>
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur">
+          <TriggerManager />
         </div>
       </template>
 
-      <!-- 设置页面 (占位) -->
+      <!-- 设置页面 -->
       <template v-else-if="activeTab === 'settings'">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-10 text-center backdrop-blur">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-          <h3 class="mt-6 text-lg font-medium text-slate-300">系统设置</h3>
-          <p class="mt-2 text-slate-500">设置功能正在开发中...</p>
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur">
+          <SystemServices />
         </div>
       </template>
     </main>
@@ -383,6 +478,8 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import ComponentManager from './components/ComponentManager.vue';
+import TriggerManager from './components/TriggerManager.vue';
+import SystemServices from './components/SystemServices.vue';
 
 const workflows = ref([]);
 const selectedWorkflowId = ref('');
@@ -401,6 +498,15 @@ const statusMessage = reactive({ type: '', text: '' });
 
 // 当前选中的导航项
 const activeTab = ref('workflows');
+
+// 组件管理相关状态
+const systemComponents = ref([]);
+const userComponents = ref([]);
+const selectedComponentId = ref('');
+const currentComponent = ref(null);
+const currentComponentType = ref('');
+const showSystemComponents = ref(true);
+const showUserComponents = ref(true);
 
 const statusClasses = computed(() => {
   if (statusMessage.type === 'error') {
@@ -700,9 +806,115 @@ async function fetchScripts() {
   }
 }
 
+// 组件管理相关方法
+async function fetchComponents() {
+  try {
+    const res = await fetch('/api/components');
+    if (!res.ok) {
+      throw new Error('无法获取组件列表');
+    }
+    const data = await res.json();
+    if (data.success) {
+      systemComponents.value = data.data.official || [];
+      userComponents.value = data.data.user || [];
+    } else {
+      setStatus('error', data.error || '获取组件列表失败');
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus('error', err.message || '获取组件列表失败');
+  }
+}
+
+function toggleSystemComponents() {
+  showSystemComponents.value = !showSystemComponents.value;
+}
+
+function toggleUserComponents() {
+  showUserComponents.value = !showUserComponents.value;
+}
+
+function selectComponent(componentId, component) {
+  selectedComponentId.value = componentId;
+  currentComponent.value = component;
+  currentComponentType.value = componentId.startsWith('system-') ? 'official' : 'user';
+}
+
+async function handleCreateComponent() {
+  const name = window.prompt('请输入新组件的名称（如：my-custom-sender）', '');
+  if (!name || name.trim() === '') {
+    return;
+  }
+  
+  const displayName = window.prompt('请输入组件的显示名称', name);
+  if (displayName === null) {
+    return;
+  }
+
+  try {
+    // 创建默认的组件清单
+    const manifest = {
+      name: name.trim(),
+      displayName: displayName.trim() || name.trim(),
+      description: '',
+      version: '1.0.0',
+      inputs: [],
+      outputs: []
+    };
+
+    // 创建默认的组件代码
+    const code = `// ${displayName || name} 组件
+// 这是一个用户自定义组件
+
+export default async function(context) {
+  const { inputs, outputs, log } = context;
+  
+  // 在这里编写你的组件逻辑
+  log.info('组件开始执行');
+  
+  // 示例：处理输入参数
+  // const result = processInputs(inputs);
+  
+  // 示例：设置输出结果
+  // outputs.result = result;
+  
+  log.info('组件执行完成');
+  
+  return {
+    success: true,
+    message: '组件执行成功'
+  };
+}`;
+
+    const res = await fetch('/api/components/user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), manifest, code })
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || '创建组件失败');
+    }
+
+    setStatus('success', `已创建组件「${displayName || name}」`);
+    await fetchComponents();
+    
+    // 自动选中新创建的组件
+    const newComponent = userComponents.value.find(c => c.name === name.trim());
+    if (newComponent) {
+      selectComponent(`user-${newComponent.name}`, newComponent);
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus('error', err.message || '创建组件失败');
+  }
+}
+
 onMounted(() => {
   fetchWorkflowsList();
   fetchScripts();
+  fetchComponents();
 });
 </script>
 

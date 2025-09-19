@@ -12,6 +12,9 @@ import { startScheduler, stopScheduler, getSchedulerStatus, updateSchedulerConfi
 import feishuWebhookRouter from './routes/feishu.js';
 import managementApiRouter from './routes/management.js';
 import componentsRouter from './routes/components.js';
+import triggersRouter from './routes/triggers.js';
+import webhookRouter from './routes/webhook.js';
+import servicesRouter from './routes/services.js';
 import {
   listWorkflows,
   getWorkflow as getWorkflowById,
@@ -337,6 +340,15 @@ app.use('/api/management', managementApiRouter);
 
 // Components API Route
 app.use('/api/components', componentsRouter);
+
+// Triggers API Route
+app.use('/api/triggers', triggersRouter);
+
+// Webhook API Route
+app.use('/api/webhook', webhookRouter);
+
+// System Services API Route
+app.use('/api/services', servicesRouter);
 
 
 // --- Server Startup ---
