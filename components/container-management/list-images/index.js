@@ -23,12 +23,12 @@ async function main() {
     
     log.info(`Listing images using ${driver} driver...`);
     
-    // 构建命令
+    // 构建命令 - 使用更兼容的格式
     const args = ['images'];
     if (all) {
       args.push('-a');
     }
-    args.push('--format', 'json');
+    args.push('--format', 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}\t{{.Size}}');
     
     // 执行命令
     const { stdout } = await execa(driver, args);
@@ -36,17 +36,24 @@ async function main() {
     // 解析输出
     let images = [];
     if (stdout.trim()) {
-      images = stdout.trim().split('\n')
-        .filter(line => line.trim())
-        .map(line => {
-          try {
-            return JSON.parse(line);
-          } catch (e) {
-            log.warn(`Failed to parse image line: ${line}`);
-            return null;
+      const lines = stdout.trim().split('\n');
+      const header = lines[0]; // 跳过表头
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line) {
+          const parts = line.split('\t');
+          if (parts.length >= 5) {
+            images.push({
+              Repository: parts[0] || '<none>',
+              Tag: parts[1] || '<none>',
+              ID: parts[2] || '',
+              CreatedAt: parts[3] || '',
+              Size: parts[4] || '0B'
+            });
           }
-        })
-        .filter(image => image !== null);
+        }
+      }
     }
     
     log.info(`Found ${images.length} images`);

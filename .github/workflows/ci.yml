@@ -1,0 +1,144 @@
+name: 🚀 CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: 🧪 测试
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 📦 设置 Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: 📥 安装依赖
+      run: npm ci
+      
+    - name: 🔍 代码检查
+      run: npm run lint
+      
+    - name: 🧪 运行测试
+      run: npm test
+      
+    - name: 🏗️ 构建项目
+      run: npm run web:build
+
+  build:
+    name: 🏗️ 构建
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 📦 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📥 安装依赖
+      run: npm ci
+      
+    - name: 🏗️ 构建前端
+      run: npm run web:build
+      
+    - name: 📦 构建Docker镜像
+      run: |
+        docker build -t orchestrator-pro:latest .
+        
+    - name: 🐳 测试Docker镜像
+      run: |
+        docker run --rm orchestrator-pro:latest --version
+
+  security:
+    name: 🛡️ 安全扫描
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 📦 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📥 安装依赖
+      run: npm ci
+      
+    - name: 🔍 安全审计
+      run: npm audit --audit-level=moderate
+      
+    - name: 🛡️ 代码安全扫描
+      uses: github/super-linter@v4
+      env:
+        DEFAULT_BRANCH: main
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    name: 🚀 部署
+    runs-on: ubuntu-latest
+    needs: [test, build, security]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 📦 设置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📥 安装依赖
+      run: npm ci
+      
+    - name: 🏗️ 构建项目
+      run: npm run web:build
+      
+    - name: 📦 发布到 npm
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        
+    - name: 🏷️ 创建 Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body: |
+          🚀 **Orchestrator Pro v${{ github.run_number }}**
+          
+          ## 🎯 新功能
+          - 新增功能1
+          - 新增功能2
+          
+          ## 🐛 Bug修复
+          - 修复问题1
+          - 修复问题2
+          
+          ## 📚 文档更新
+          - 更新README
+          - 完善API文档
+        draft: false
+        prerelease: false

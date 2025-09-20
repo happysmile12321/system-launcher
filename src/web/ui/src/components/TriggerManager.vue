@@ -19,6 +19,18 @@
           >
             + 创建 Webhook
           </button>
+          <button
+            class="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-300 transition hover:bg-amber-500/10"
+            @click="createManualTrigger"
+          >
+            + 创建手动触发器
+          </button>
+          <button
+            class="rounded-lg border border-purple-500 px-4 py-2 text-sm font-medium text-purple-300 transition hover:bg-purple-500/10"
+            @click="createSystemEventTrigger"
+          >
+            + 创建系统事件触发器
+          </button>
         </div>
       </div>
     </div>
@@ -453,6 +465,29 @@ export default {
       showCreateModal.value = true;
     }
 
+    // 创建手动触发器
+    function createManualTrigger() {
+      newWebhook.value = {
+        name: '',
+        description: '',
+        workflowId: '',
+        type: 'manual'
+      };
+      showCreateModal.value = true;
+    }
+
+    // 创建系统事件触发器
+    function createSystemEventTrigger() {
+      newWebhook.value = {
+        name: '',
+        description: '',
+        workflowId: '',
+        type: 'system-event',
+        eventType: 'container-start' // 默认事件类型
+      };
+      showCreateModal.value = true;
+    }
+
     async function submitCreateWebhook() {
       if (!newWebhook.value.name || !newWebhook.value.workflowId) {
         alert('请填写必要信息');
@@ -616,6 +651,8 @@ export default {
       createCronTrigger,
       submitCreateCronTrigger,
       createWebhook,
+      createManualTrigger,
+      createSystemEventTrigger,
       submitCreateWebhook,
       toggleWebhook,
       deleteWebhook,

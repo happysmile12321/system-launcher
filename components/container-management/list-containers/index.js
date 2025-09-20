@@ -23,28 +23,39 @@ async function main() {
     
     log.info(`Listing containers using ${driver} driver...`);
     
-    // 构建命令
+    // 构建命令 - 使用更兼容的格式
     const args = ['ps'];
     if (all) {
       args.push('-a');
     }
-    args.push('--format', 'json');
+    args.push('--format', 'table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.CreatedAt}}');
     
     // 执行命令
     const { stdout } = await execa(driver, args);
     
     // 解析输出
-    const containers = stdout.trim().split('\n')
-      .filter(line => line.trim())
-      .map(line => {
-        try {
-          return JSON.parse(line);
-        } catch (e) {
-          log.warn(`Failed to parse container line: ${line}`);
-          return null;
+    let containers = [];
+    if (stdout.trim()) {
+      const lines = stdout.trim().split('\n');
+      const header = lines[0]; // 跳过表头
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line) {
+          const parts = line.split('\t');
+          if (parts.length >= 6) {
+            containers.push({
+              ID: parts[0] || '',
+              Names: parts[1] || '',
+              Image: parts[2] || '',
+              Status: parts[3] || '',
+              Ports: parts[4] || '',
+              CreatedAt: parts[5] || ''
+            });
+          }
         }
-      })
-      .filter(container => container !== null);
+      }
+    }
     
     log.info(`Found ${containers.length} containers`);
     

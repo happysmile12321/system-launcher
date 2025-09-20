@@ -1,0 +1,151 @@
+# 🚀 Orchestrator Pro - Docker Compose 配置
+version: '3.8'
+
+services:
+  # 主应用服务
+  orchestrator-pro:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: orchestrator-pro
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      # 挂载Docker socket以支持容器管理
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # 挂载配置目录
+      - orchestrator-data:/app/.orchestrator-pro
+      # 挂载组件目录
+      - ./components:/app/components:ro
+    networks:
+      - orchestrator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.orchestrator.rule=Host(`orchestrator.local`)"
+      - "traefik.http.services.orchestrator.loadbalancer.server.port=3000"
+
+  # Redis 缓存服务 (可选)
+  redis:
+    image: redis:7-alpine
+    container_name: orchestrator-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - orchestrator-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # PostgreSQL 数据库 (可选)
+  postgres:
+    image: postgres:15-alpine
+    container_name: orchestrator-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: orchestrator
+      POSTGRES_USER: orchestrator
+      POSTGRES_PASSWORD: orchestrator_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - orchestrator-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestrator"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Nginx 反向代理 (可选)
+  nginx:
+    image: nginx:alpine
+    container_name: orchestrator-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - orchestrator-network
+    restart: unless-stopped
+    depends_on:
+      - orchestrator-pro
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # 监控服务 (可选)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: orchestrator-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - orchestrator-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  # Grafana 可视化 (可选)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: orchestrator-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - orchestrator-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+# 网络配置
+networks:
+  orchestrator-network:
+    driver: bridge
+    name: orchestrator-network
+
+# 数据卷配置
+volumes:
+  orchestrator-data:
+    name: orchestrator-data
+  redis-data:
+    name: orchestrator-redis-data
+  postgres-data:
+    name: orchestrator-postgres-data
+  prometheus-data:
+    name: orchestrator-prometheus-data
+  grafana-data:
+    name: orchestrator-grafana-data
