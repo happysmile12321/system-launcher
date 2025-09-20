@@ -30,6 +30,7 @@
     "execa": "^8.0.1",
     "express": "^4.19.2",
     "inquirer": "^9.2.20",
+    "lucide-vue-next": "^0.544.0",
     "monaco-editor": "^0.53.0",
     "node-fetch": "^3.3.2",
     "node-schedule": "^2.1.1",

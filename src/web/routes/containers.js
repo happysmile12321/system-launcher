@@ -49,6 +49,54 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * 获取镜像列表
+ */
+router.get('/images', async (req, res) => {
+  try {
+    const { all } = req.query;
+    const images = await containerManagementService.getImages(all === 'true');
+    
+    res.json({
+      success: true,
+      data: images
+    });
+  } catch (err) {
+    error(`Failed to get images: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * 获取容器日志
+ */
+router.get('/:id/logs', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tail = 100, follow = false } = req.query;
+    
+    const logs = await containerManagementService.getContainerLogs(
+      id, 
+      parseInt(tail), 
+      follow === 'true'
+    );
+    
+    res.json({
+      success: true,
+      data: { logs }
+    });
+  } catch (err) {
+    error(`Failed to get container logs: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
  * 启动容器
  */
 router.post('/:containerId/start', async (req, res) => {
@@ -137,21 +185,50 @@ router.delete('/:containerId', async (req, res) => {
 });
 
 /**
- * 获取容器日志
+ * 删除镜像
  */
-router.get('/:containerId/logs', async (req, res) => {
+router.delete('/images/:imageId', async (req, res) => {
   try {
-    const { containerId } = req.params;
-    const { lines = 100 } = req.query;
+    const { imageId } = req.params;
+    const { force = false } = req.query;
     
-    const logs = await containerManagementService.getContainerLogs(containerId, parseInt(lines));
+    const result = await containerManagementService.removeImage(imageId, force === 'true');
     
     res.json({
       success: true,
-      data: logs
+      data: result
     });
   } catch (err) {
-    error(`Failed to get container logs: ${err.message}`);
+    error(`Failed to remove image: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * 部署Docker Compose
+ */
+router.post('/compose/deploy', async (req, res) => {
+  try {
+    const { composeContent, projectName } = req.body;
+    
+    if (!composeContent) {
+      return res.status(400).json({
+        success: false,
+        error: 'Docker Compose内容不能为空'
+      });
+    }
+    
+    const result = await containerManagementService.executeCompose(composeContent, projectName);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    error(`Failed to deploy compose: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message

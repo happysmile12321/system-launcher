@@ -1,0 +1,31 @@
+{
+  "name": "remove-container",
+  "description": "删除指定的容器",
+  "inputs": {
+    "containerId": {
+      "type": "string",
+      "description": "容器ID或名称",
+      "required": true
+    },
+    "driver": {
+      "type": "string",
+      "description": "容器驱动 (docker 或 podman)",
+      "required": true
+    },
+    "force": {
+      "type": "boolean",
+      "description": "是否强制删除",
+      "default": false
+    }
+  },
+  "outputs": {
+    "success": {
+      "type": "string",
+      "description": "操作是否成功"
+    },
+    "message": {
+      "type": "string",
+      "description": "操作结果消息"
+    }
+  }
+}

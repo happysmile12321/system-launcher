@@ -1,0 +1,32 @@
+{
+  "name": "get-container-logs",
+  "description": "获取容器的日志",
+  "inputs": {
+    "containerId": {
+      "type": "string",
+      "description": "容器ID或名称",
+      "required": true
+    },
+    "driver": {
+      "type": "string",
+      "description": "容器驱动 (docker 或 podman)",
+      "required": true
+    },
+    "tail": {
+      "type": "number",
+      "description": "显示最后N行日志",
+      "default": 100
+    },
+    "follow": {
+      "type": "boolean",
+      "description": "是否实时跟踪日志",
+      "default": false
+    }
+  },
+  "outputs": {
+    "logs": {
+      "type": "string",
+      "description": "容器日志内容"
+    }
+  }
+}

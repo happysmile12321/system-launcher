@@ -193,6 +193,129 @@ class ContainerManagementService {
   }
 
   /**
+   * 获取容器日志
+   * @param {string} containerId - 容器ID
+   * @param {number} tail - 显示最后N行
+   * @param {boolean} follow - 是否实时跟踪
+   * @returns {Promise<string>} - 日志内容
+   */
+  async getContainerLogs(containerId, tail = 100, follow = false) {
+    try {
+      await this.initialize();
+      
+      if (!this.currentDriver) {
+        throw new Error('No container runtime available');
+      }
+
+      const result = await this.executeComponent('local:container-management/get-container-logs', {
+        containerId,
+        driver: this.currentDriver,
+        tail,
+        follow
+      });
+
+      return result.outputs.logs;
+    } catch (err) {
+      error(`Failed to get container logs: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * 获取镜像列表
+   * @param {boolean} all - 是否显示所有镜像
+   * @returns {Promise<Array>} - 镜像列表
+   */
+  async getImages(all = false) {
+    try {
+      await this.initialize();
+      
+      if (!this.currentDriver) {
+        throw new Error('No container runtime available');
+      }
+
+      const result = await this.executeComponent('local:container-management/list-images', {
+        driver: this.currentDriver,
+        all
+      });
+
+      return JSON.parse(result.outputs.images);
+    } catch (err) {
+      error(`Failed to get images: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * 删除镜像
+   * @param {string} imageId - 镜像ID
+   * @param {boolean} force - 是否强制删除
+   * @returns {Promise<Object>} - 操作结果
+   */
+  async removeImage(imageId, force = false) {
+    try {
+      await this.initialize();
+      
+      if (!this.currentDriver) {
+        throw new Error('No container runtime available');
+      }
+
+      const result = await this.executeComponent('local:container-management/remove-image', {
+        imageId,
+        driver: this.currentDriver,
+        force
+      });
+
+      if (result.success) {
+        success(`Removed image: ${imageId}`);
+        return { success: true, message: result.outputs.message };
+      } else {
+        throw new Error(result.outputs.message || 'Failed to remove image');
+      }
+    } catch (err) {
+      error(`Failed to remove image ${imageId}: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * 执行Docker Compose命令
+   * @param {string} composeContent - Compose文件内容
+   * @param {string} projectName - 项目名称
+   * @returns {Promise<Object>} - 操作结果
+   */
+  async executeCompose(composeContent, projectName = 'orchestrator-compose') {
+    try {
+      await this.initialize();
+      
+      if (!this.currentDriver) {
+        throw new Error('No container runtime available');
+      }
+
+      const result = await this.executeComponent('local:container-management/exec-compose', {
+        command: 'up -d',
+        composeFileContent: composeContent,
+        projectName,
+        driver: this.currentDriver
+      });
+
+      if (result.success) {
+        success(`Docker Compose deployed successfully`);
+        return { 
+          success: true, 
+          output: result.outputs.output,
+          message: 'Docker Compose部署成功'
+        };
+      } else {
+        throw new Error(result.outputs.output || 'Failed to deploy Docker Compose');
+      }
+    } catch (err) {
+      error(`Failed to execute Docker Compose: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
    * 删除容器
    */
   async removeContainer(containerId) {

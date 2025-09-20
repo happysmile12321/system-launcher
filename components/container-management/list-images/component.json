@@ -1,0 +1,22 @@
+{
+  "name": "list-images",
+  "description": "列出所有Docker镜像",
+  "inputs": {
+    "driver": {
+      "type": "string",
+      "description": "容器驱动 (docker 或 podman)",
+      "required": true
+    },
+    "all": {
+      "type": "boolean",
+      "description": "是否显示所有镜像 (包括中间镜像)",
+      "default": false
+    }
+  },
+  "outputs": {
+    "images": {
+      "type": "json",
+      "description": "镜像列表 (JSON字符串)"
+    }
+  }
+}
