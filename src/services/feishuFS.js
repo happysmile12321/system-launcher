@@ -110,6 +110,145 @@ class FeishuFS {
   }
 
   /**
+   * 获取工作空间列表
+   * @returns {Array} - 工作空间列表
+   */
+  async getWorkspaces() {
+    try {
+      const accessToken = await this.getAccessToken();
+      
+      const response = await fetch(`${this.baseUrl}/drive/v1/files`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        params: {
+          page_size: 200,
+          order_by: 'created_time',
+          direction: 'desc'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Failed to get workspaces: ${errorData.error_description || response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.code !== 0) {
+        throw new Error(`Feishu API error: ${data.msg}`);
+      }
+
+      // 过滤出文件夹类型的工作空间
+      const workspaces = data.data.files?.filter(file => file.type === 'folder') || [];
+      
+      // 添加根目录作为默认工作空间
+      const rootFolder = await this.getRootFolder();
+      workspaces.unshift({
+        token: rootFolder.token,
+        name: '根目录',
+        type: 'folder',
+        is_root: true
+      });
+
+      return workspaces;
+
+    } catch (err) {
+      error(`Failed to get workspaces: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * 设置默认工作空间
+   * @param {string} workspaceToken - 工作空间令牌
+   * @param {string} workspaceName - 工作空间名称
+   */
+  async setDefaultWorkspace(workspaceToken, workspaceName) {
+    try {
+      const config = await getConfig();
+      
+      // 检查是否有GitHub配置
+      if (!config.github?.token) {
+        // 如果没有GitHub配置，只保存到本地缓存
+        const workspaceData = {
+          token: workspaceToken,
+          name: workspaceName,
+          selectedAt: new Date().toISOString()
+        };
+        
+        this.defaultWorkspace = workspaceData;
+        success(`默认工作空间已设置为: ${workspaceName} (仅本地缓存)`);
+        return;
+      }
+      
+      const gitfs = new GitFS(config);
+      
+      const workspaceData = {
+        token: workspaceToken,
+        name: workspaceName,
+        selectedAt: new Date().toISOString()
+      };
+      
+      // 确保.orchestrator-pro目录存在
+      await gitfs.createDirectory('.orchestrator-pro');
+      
+      // 保存默认工作空间到GitFS
+      await gitfs.writeFile(
+        '.orchestrator-pro/feishu-workspace.json',
+        JSON.stringify(workspaceData, null, 2),
+        'Set default Feishu workspace'
+      );
+      
+      // 更新本地缓存
+      this.defaultWorkspace = workspaceData;
+      
+      success(`默认工作空间已设置为: ${workspaceName}`);
+      
+    } catch (err) {
+      error(`设置默认工作空间失败: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * 获取默认工作空间
+   * @returns {Object|null} - 默认工作空间信息
+   */
+  async getDefaultWorkspace() {
+    try {
+      if (this.defaultWorkspace) {
+        return this.defaultWorkspace;
+      }
+
+      const config = await getConfig();
+      
+      // 检查是否有GitHub配置
+      if (!config.github?.token) {
+        info('GitHub未配置，无法从GitFS读取工作空间配置');
+        return null;
+      }
+      
+      const gitfs = new GitFS(config);
+      
+      const workspaceFile = await gitfs.readFile('.orchestrator-pro/feishu-workspace.json');
+      
+      if (workspaceFile) {
+        this.defaultWorkspace = JSON.parse(workspaceFile.content);
+        return this.defaultWorkspace;
+      }
+      
+      return null;
+      
+    } catch (err) {
+      info(`未找到默认工作空间配置: ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
    * 列出文件夹内容
    * @param {string} folderToken - 文件夹令牌
    * @param {Object} options - 选项

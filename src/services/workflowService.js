@@ -36,38 +36,52 @@ async function getGitFsInstance() {
   if (!config) {
     throw new Error('Application is not configured.');
   }
+  
+  // 检查GitHub配置
+  if (!config.github?.token) {
+    throw new Error('GitHub token is not configured. Please configure GitHub integration first.');
+  }
+  
   return new GitFS(config);
 }
 
 export async function listWorkflows() {
-  const gitfs = await getGitFsInstance();
-  const entries = await gitfs.listDirectory(WORKFLOW_DIR);
+  try {
+    const gitfs = await getGitFsInstance();
+    const entries = await gitfs.listDirectory(WORKFLOW_DIR);
 
-  const workflowFiles = entries.filter((item) => item.type === 'file' && item.name.endsWith(WORKFLOW_SUFFIX));
+    const workflowFiles = entries.filter((item) => item.type === 'file' && item.name.endsWith(WORKFLOW_SUFFIX));
 
-  const workflows = [];
-  for (const file of workflowFiles) {
-    const id = file.name.replace(WORKFLOW_SUFFIX, '');
-    try {
-      const fileData = await gitfs.readFile(`${WORKFLOW_DIR}/${file.name}`);
-      if (!fileData) {
-        continue;
+    const workflows = [];
+    for (const file of workflowFiles) {
+      const id = file.name.replace(WORKFLOW_SUFFIX, '');
+      try {
+        const fileData = await gitfs.readFile(`${WORKFLOW_DIR}/${file.name}`);
+        if (!fileData) {
+          continue;
+        }
+        const workflow = parseWorkflowContent(fileData.content, id);
+        workflows.push({
+          id,
+          name: workflow.name || id,
+          description: workflow.description || '',
+          enabled: workflow.enabled !== false,
+          triggerType: workflow.trigger?.type || 'cron',
+        });
+      } catch (err) {
+        error(`Unable to read workflow ${id}: ${err.message}`);
       }
-      const workflow = parseWorkflowContent(fileData.content, id);
-      workflows.push({
-        id,
-        name: workflow.name || id,
-        description: workflow.description || '',
-        enabled: workflow.enabled !== false,
-        triggerType: workflow.trigger?.type || 'cron',
-      });
-    } catch (err) {
-      error(`Unable to read workflow ${id}: ${err.message}`);
     }
-  }
 
-  workflows.sort((a, b) => a.name.localeCompare(b.name));
-  return workflows;
+    workflows.sort((a, b) => a.name.localeCompare(b.name));
+    return workflows;
+  } catch (err) {
+    if (err.message.includes('GitHub token is not configured')) {
+      info('GitHub not configured, returning empty workflow list');
+      return [];
+    }
+    throw err;
+  }
 }
 
 export async function getWorkflow(id) {

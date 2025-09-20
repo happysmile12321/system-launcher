@@ -521,6 +521,75 @@ router.get('/fs/status', async (req, res) => {
   }
 });
 
+/**
+ * 获取工作空间列表
+ */
+router.get('/workspaces', async (req, res) => {
+  try {
+    const workspaces = await feishuFS.getWorkspaces();
+    
+    res.json({
+      success: true,
+      data: workspaces
+    });
+  } catch (err) {
+    error(`Failed to get workspaces: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * 设置默认工作空间
+ */
+router.post('/workspace/set-default', async (req, res) => {
+  try {
+    const { token, name } = req.body;
+    
+    if (!token || !name) {
+      return res.status(400).json({
+        success: false,
+        error: 'Workspace token and name are required'
+      });
+    }
+    
+    await feishuFS.setDefaultWorkspace(token, name);
+    
+    res.json({
+      success: true,
+      message: '默认工作空间设置成功'
+    });
+  } catch (err) {
+    error(`Failed to set default workspace: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * 获取默认工作空间
+ */
+router.get('/workspace/default', async (req, res) => {
+  try {
+    const workspace = await feishuFS.getDefaultWorkspace();
+    
+    res.json({
+      success: true,
+      data: workspace
+    });
+  } catch (err) {
+    error(`Failed to get default workspace: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
 // 用于处理审批实例的回调
 router.post('/approval', (req, res) => {
     incrementCounter('orchestrator_pro_feishu_api_calls_total', { route: 'approval' }, 1);

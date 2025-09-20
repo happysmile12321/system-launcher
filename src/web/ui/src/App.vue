@@ -1312,6 +1312,71 @@
         </div>
       </div>
     </div>
+
+    <!-- 工作空间选择对话框 -->
+    <div v-if="showWorkspaceDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-slate-100">选择工作空间</h3>
+          <p class="mt-1 text-sm text-slate-400">请选择您要使用的飞书工作空间，后续的文件操作将在此空间中进行</p>
+        </div>
+
+        <div v-if="workspaceLoading" class="flex items-center justify-center py-8">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+          <span class="ml-2 text-sm text-slate-400">加载工作空间列表中...</span>
+        </div>
+
+        <div v-else-if="feishuWorkspaces.length === 0" class="text-center py-8">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto text-slate-500">
+            <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+            <path d="M8 21v-4a2 2 0 012-2h4a2 2 0 012 2v4"></path>
+          </svg>
+          <h3 class="mt-4 text-lg font-medium text-slate-300">暂无工作空间</h3>
+          <p class="mt-2 text-slate-500">未找到可用的工作空间</p>
+        </div>
+
+        <div v-else class="space-y-3 max-h-96 overflow-y-auto">
+          <div
+            v-for="workspace in feishuWorkspaces"
+            :key="workspace.token"
+            @click="selectWorkspace(workspace)"
+            class="flex items-center gap-3 p-4 rounded-lg border border-slate-700 bg-slate-800/40 hover:bg-slate-800/60 cursor-pointer transition"
+          >
+            <div class="flex-shrink-0">
+              <div class="w-10 h-10 rounded-lg bg-sky-500/20 flex items-center justify-center">
+                <svg v-if="workspace.is_root" class="w-5 h-5 text-sky-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+                </svg>
+                <svg v-else class="w-5 h-5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                </svg>
+              </div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-sm font-medium text-slate-100 truncate">{{ workspace.name }}</h4>
+              <p class="text-xs text-slate-400 mt-1">
+                {{ workspace.is_root ? '根目录' : '文件夹' }}
+              </p>
+            </div>
+            <div class="flex-shrink-0">
+              <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 pt-4 mt-6 border-t border-slate-700">
+          <button
+            type="button"
+            @click="showWorkspaceDialog = false"
+            class="flex-1 rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
+          >
+            稍后选择
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1358,6 +1423,12 @@ const feishuFiles = ref([]);
 const feishuFilesLoading = ref(false);
 const backupPlans = ref([]);
 const backupPlansLoading = ref(false);
+
+// 飞书工作空间相关状态
+const feishuWorkspaces = ref([]);
+const feishuDefaultWorkspace = ref(null);
+const showWorkspaceDialog = ref(false);
+const workspaceLoading = ref(false);
 
 // 飞书配置相关
 const showFeishuConfigDialog = ref(false);
@@ -2017,8 +2088,17 @@ async function startFeishuWebSocket() {
       setStatus('success', '飞书WebSocket长连接启动成功');
       await checkFeishuWebSocketStatus();
       
-      // 连接成功后自动刷新文件列表
-      await refreshFeishuFiles();
+      // 检查是否已有默认工作空间
+      await checkDefaultWorkspace();
+      
+      // 如果没有默认工作空间，显示工作空间选择对话框
+      if (!feishuDefaultWorkspace.value) {
+        await loadWorkspaces();
+        showWorkspaceDialog.value = true;
+      } else {
+        // 连接成功后自动刷新文件列表
+        await refreshFeishuFiles();
+      }
       return true;
     } else {
       setStatus('error', data.error || '启动WebSocket连接失败');
@@ -2075,6 +2155,70 @@ async function openFeishuLongConnectionConfig() {
   } catch (err) {
     console.error('打开飞书长连接配置失败:', err);
     setStatus('error', '打开飞书长连接配置失败');
+  }
+}
+
+async function checkDefaultWorkspace() {
+  try {
+    const res = await fetch('/api/feishu/workspace/default');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        feishuDefaultWorkspace.value = data.data;
+      }
+    }
+  } catch (err) {
+    console.error('获取默认工作空间失败:', err);
+  }
+}
+
+async function loadWorkspaces() {
+  workspaceLoading.value = true;
+  try {
+    const res = await fetch('/api/feishu/workspaces');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        feishuWorkspaces.value = data.data;
+      }
+    }
+  } catch (err) {
+    console.error('获取工作空间列表失败:', err);
+    setStatus('error', '获取工作空间列表失败');
+  } finally {
+    workspaceLoading.value = false;
+  }
+}
+
+async function selectWorkspace(workspace) {
+  try {
+    const res = await fetch('/api/feishu/workspace/set-default', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: workspace.token,
+        name: workspace.name
+      })
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        feishuDefaultWorkspace.value = {
+          token: workspace.token,
+          name: workspace.name,
+          selectedAt: new Date().toISOString()
+        };
+        showWorkspaceDialog.value = false;
+        setStatus('success', `已选择工作空间: ${workspace.name}`);
+        
+        // 选择工作空间后刷新文件列表
+        await refreshFeishuFiles();
+      }
+    }
+  } catch (err) {
+    console.error('设置工作空间失败:', err);
+    setStatus('error', '设置工作空间失败');
   }
 }
 
@@ -2646,6 +2790,7 @@ onMounted(() => {
   checkFeishuAuthStatus();
   checkFeishuConfigStatus();
   checkFeishuWebSocketStatus();
+  checkDefaultWorkspace();
   refreshBackupPlans();
   loadBackupWorkflows();
   loadCronSuggestions();
