@@ -23,12 +23,12 @@ async function main() {
     
     log.info(`Listing containers using ${driver} driver...`);
     
-    // 构建命令 - 使用更兼容的格式
+    // 构建命令 - 使用JSON格式输出
     const args = ['ps'];
     if (all) {
       args.push('-a');
     }
-    args.push('--format', 'table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.CreatedAt}}');
+    args.push('--format', 'json');
     
     // 执行命令
     const { stdout } = await execa(driver, args);
@@ -37,21 +37,22 @@ async function main() {
     let containers = [];
     if (stdout.trim()) {
       const lines = stdout.trim().split('\n');
-      const header = lines[0]; // 跳过表头
       
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line) {
-          const parts = line.split('\t');
-          if (parts.length >= 6) {
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            const container = JSON.parse(line);
             containers.push({
-              ID: parts[0] || '',
-              Names: parts[1] || '',
-              Image: parts[2] || '',
-              Status: parts[3] || '',
-              Ports: parts[4] || '',
-              CreatedAt: parts[5] || ''
+              ID: container.ID || container.Id || '',
+              Names: container.Names || container.Name || '',
+              Image: container.Image || '',
+              Status: container.Status || container.State || '',
+              State: container.State || container.Status || '',
+              Ports: container.Ports || '',
+              CreatedAt: container.CreatedAt || container.Created || ''
             });
+          } catch (parseErr) {
+            log.warn(`Failed to parse container line: ${line}`);
           }
         }
       }

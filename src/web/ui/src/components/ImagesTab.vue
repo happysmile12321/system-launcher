@@ -165,8 +165,17 @@ function getImageName(repository) {
 }
 
 // 格式化大小
-function formatSize(bytes) {
-  if (!bytes) return '0 B';
+function formatSize(size) {
+  if (!size) return '0 B';
+  
+  // 如果已经是格式化的字符串（如"10.1GB"），直接返回
+  if (typeof size === 'string' && /^\d+\.?\d*[A-Z]+$/.test(size)) {
+    return size;
+  }
+  
+  // 如果是数字，按字节格式化
+  const bytes = parseInt(size);
+  if (isNaN(bytes)) return '0 B';
   
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));

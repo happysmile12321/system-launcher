@@ -75,27 +75,36 @@ class ContainerManagementService {
         return [];
       }
 
-      // 使用官方组件执行容器列表命令
-      const result = await this.executeComponent('local:container-management/list-containers', {
-        driver: this.currentDriver,
-        all: true
-      });
-
-      if (result.success && result.outputs.containers) {
-        const containers = JSON.parse(result.outputs.containers);
-        return containers.map(container => ({
-          id: container.ID || container.id,
-          name: container.Names || container.name,
-          image: container.Image || container.image,
-          status: container.Status || container.status,
-          state: container.State || container.state,
-          created: container.CreatedAt || container.created,
-          ports: this.parsePorts(container.Ports || container.ports),
-          size: container.Size || container.size
-        }));
+      // 直接使用Docker命令获取容器列表
+      const args = ['ps', '-a', '--format', 'json'];
+      const { stdout } = await execAsync(`${this.currentDriver} ${args.join(' ')}`);
+      
+      let containers = [];
+      if (stdout.trim()) {
+        const lines = stdout.trim().split('\n');
+        
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const container = JSON.parse(line);
+              containers.push({
+                ID: container.ID || container.Id || '',
+                Names: container.Names || container.Name || '',
+                Image: container.Image || '',
+                Status: container.Status || container.State || '',
+                State: container.State || container.Status || '',
+                Ports: container.Ports || '',
+                CreatedAt: container.CreatedAt || container.Created || ''
+              });
+            } catch (parseErr) {
+              warning(`Failed to parse container line: ${line}`);
+            }
+          }
+        }
       }
 
-      return [];
+      info(`Found ${containers.length} containers`);
+      return containers;
     } catch (err) {
       error(`Failed to get containers: ${err.message}`);
       return [];
@@ -234,12 +243,37 @@ class ContainerManagementService {
         throw new Error('No container runtime available');
       }
 
-      const result = await this.executeComponent('local:container-management/list-images', {
-        driver: this.currentDriver,
-        all
-      });
+      // 直接使用Docker命令获取镜像列表
+      const args = ['images', '--format', 'json'];
+      if (all) {
+        args.push('-a');
+      }
+      const { stdout } = await execAsync(`${this.currentDriver} ${args.join(' ')}`);
+      
+      let images = [];
+      if (stdout.trim()) {
+        const lines = stdout.trim().split('\n');
+        
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const image = JSON.parse(line);
+              images.push({
+                ID: image.ID || image.Id || '',
+                Repository: image.Repository || '',
+                Tag: image.Tag || '',
+                CreatedAt: image.CreatedAt || image.Created || '',
+                Size: image.Size || ''
+              });
+            } catch (parseErr) {
+              warning(`Failed to parse image line: ${line}`);
+            }
+          }
+        }
+      }
 
-      return JSON.parse(result.outputs.images);
+      info(`Found ${images.length} images`);
+      return images;
     } catch (err) {
       error(`Failed to get images: ${err.message}`);
       throw err;
