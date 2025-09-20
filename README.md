@@ -178,6 +178,16 @@ npm run web:dev
 npm run web:build
 ```
 
+**访问地址**: http://localhost:3000
+
+**路由模式**: 使用Hash路由模式，URL格式为：
+- 工作流: `http://localhost:3000/#/workflows`
+- 组件: `http://localhost:3000/#/components`
+- 触发器: `http://localhost:3000/#/triggers`
+- 备份管理: `http://localhost:3000/#/backup`
+- 容器管理: `http://localhost:3000/#/containers`
+- 系统服务: `http://localhost:3000/#/services`
+
 ### 命令行界面
 
 ```bash
