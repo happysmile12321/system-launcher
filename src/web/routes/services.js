@@ -1,23 +1,45 @@
 import express from 'express';
-import systemService from '../../services/systemService.js';
+import { getConfig } from '../../services/configService.js';
+import GitFS from '../../core/gitfs.js';
 import { info, error, success } from '../../utils/logger.js';
 
 const router = express.Router();
 
 /**
- * 获取所有系统服务
+ * 获取所有服务状态
  */
-router.get('/', async (req, res) => {
+router.get('/status', async (req, res) => {
   try {
-    info('获取系统服务列表');
-    const services = await systemService.getAllServices();
-    
+    const config = await getConfig();
+    const services = {};
+
+    // 容器管理服务状态
+    services['container-management'] = {
+      configured: !!(config.container?.driver),
+      status: config.container?.driver ? '已配置' : '未配置',
+      config: config.container || {}
+    };
+
+    // 备份管理服务状态
+    services['backup-management'] = {
+      configured: !!(config.storage?.driver),
+      status: config.storage?.driver ? '已配置' : '未配置',
+      config: config.storage || {}
+    };
+
+    // 飞书集成服务状态
+    services['feishu-integration'] = {
+      configured: !!(config.feishu?.appId && config.feishu?.appSecret),
+      status: (config.feishu?.appId && config.feishu?.appSecret) ? '已配置' : '未配置',
+      config: config.feishu || {}
+    };
+
     res.json({
       success: true,
       data: services
     });
   } catch (err) {
-    error(`获取系统服务列表失败: ${err.message}`);
+    error(`获取服务状态失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message
@@ -26,50 +48,38 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * 获取已安装的系统服务
+ * 获取特定服务配置
  */
-router.get('/installed', async (req, res) => {
-  try {
-    info('获取已安装的系统服务');
-    const services = await systemService.getInstalledServices();
-    
-    res.json({
-      success: true,
-      data: services
-    });
-  } catch (err) {
-    error(`获取已安装的系统服务失败: ${err.message}`);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
-  }
-});
-
-/**
- * 获取系统服务详情
- */
-router.get('/:serviceId', async (req, res) => {
+router.get('/:serviceId/config', async (req, res) => {
   try {
     const { serviceId } = req.params;
-    info(`获取系统服务详情: ${serviceId}`);
+    const config = await getConfig();
     
-    const service = await systemService.getService(serviceId);
+    let serviceConfig = {};
     
-    if (!service) {
-      res.status(404).json({
-        success: false,
-        error: '系统服务不存在'
-      });
-      return;
+    switch (serviceId) {
+      case 'container-management':
+        serviceConfig = config.container || {};
+        break;
+      case 'backup-management':
+        serviceConfig = config.storage || {};
+        break;
+      case 'feishu-integration':
+        serviceConfig = config.feishu || {};
+        break;
+      default:
+        return res.status(404).json({
+          success: false,
+          error: '服务不存在'
+        });
     }
-    
+
     res.json({
       success: true,
-      data: service
+      config: serviceConfig
     });
   } catch (err) {
-    error(`获取系统服务详情失败: ${err.message}`);
+    error(`获取服务配置失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message
@@ -78,88 +88,75 @@ router.get('/:serviceId', async (req, res) => {
 });
 
 /**
- * 安装系统服务
+ * 保存特定服务配置
  */
-router.post('/:serviceId/install', async (req, res) => {
+router.post('/:serviceId/config', async (req, res) => {
   try {
     const { serviceId } = req.params;
-    info(`安装系统服务: ${serviceId}`);
+    const configData = req.body;
+    const config = await getConfig();
     
-    await systemService.installService(serviceId);
-    
-    res.json({
-      success: true,
-      message: '系统服务安装成功'
-    });
-  } catch (err) {
-    error(`安装系统服务失败: ${err.message}`);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
-  }
-});
+    if (!config) {
+      return res.status(400).json({
+        success: false,
+        error: '系统配置未初始化'
+      });
+    }
 
-/**
- * 卸载系统服务
- */
-router.post('/:serviceId/uninstall', async (req, res) => {
-  try {
-    const { serviceId } = req.params;
-    info(`卸载系统服务: ${serviceId}`);
+    const gitfs = new GitFS(config);
     
-    await systemService.uninstallService(serviceId);
-    
-    res.json({
-      success: true,
-      message: '系统服务卸载成功'
-    });
-  } catch (err) {
-    error(`卸载系统服务失败: ${err.message}`);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
-  }
-});
+    // 根据服务类型更新配置
+    switch (serviceId) {
+      case 'container-management':
+        config.container = {
+          ...config.container,
+          ...configData
+        };
+        break;
+      case 'backup-management':
+        config.storage = {
+          ...config.storage,
+          ...configData
+        };
+        break;
+      case 'feishu-integration':
+        config.feishu = {
+          ...config.feishu,
+          ...configData
+        };
+        
+        // 保存飞书配置到GitFS
+        if (configData.appId || configData.appSecret || configData.redirectUri) {
+          await gitfs.createDirectory('.orchestrator-pro');
+          await gitfs.writeFile(
+            '.orchestrator-pro/feishu-config.json',
+            JSON.stringify(config.feishu, null, 2),
+            'Update Feishu configuration'
+          );
+        }
+        break;
+      default:
+        return res.status(404).json({
+          success: false,
+          error: '服务不存在'
+        });
+    }
 
-/**
- * 检查依赖
- */
-router.get('/check-dependency/:dependency', async (req, res) => {
-  try {
-    const { dependency } = req.params;
-    info(`检查依赖: ${dependency}`);
-    
-    const isInstalled = await systemService.checkDependency(dependency);
-    
-    res.json({
-      success: true,
-      installed: isInstalled
-    });
-  } catch (err) {
-    error(`检查依赖失败: ${err.message}`);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
-  }
-});
+    // 保存更新后的配置
+    await gitfs.writeFile(
+      '.orchestrator-pro/config.json',
+      JSON.stringify(config, null, 2),
+      `Update ${serviceId} configuration`
+    );
 
-/**
- * 刷新系统服务列表
- */
-router.post('/refresh', async (req, res) => {
-  try {
-    info('刷新系统服务列表');
-    await systemService.refresh();
+    success(`${serviceId} 配置保存成功`);
     
     res.json({
       success: true,
-      message: '系统服务列表已刷新'
+      message: '配置保存成功'
     });
   } catch (err) {
-    error(`刷新系统服务列表失败: ${err.message}`);
+    error(`保存服务配置失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message

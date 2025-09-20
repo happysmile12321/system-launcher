@@ -226,6 +226,38 @@ export default {
             help: '备份文件保留天数'
           }
         ]
+      },
+      {
+        id: 'feishu-integration',
+        name: '飞书集成',
+        description: '飞书OAuth认证和云盘集成服务',
+        type: '集成服务',
+        icon: DatabaseIcon,
+        configFields: [
+          {
+            name: 'appId',
+            label: 'App ID',
+            type: 'text',
+            required: true,
+            placeholder: 'cli_xxxxxxxxxxxxx',
+            help: '飞书应用的App ID'
+          },
+          {
+            name: 'appSecret',
+            label: 'App Secret',
+            type: 'password',
+            required: true,
+            placeholder: 'xxxxxxxxxxxxxxxx',
+            help: '飞书应用的App Secret'
+          },
+          {
+            name: 'redirectUri',
+            label: '重定向URI',
+            type: 'text',
+            placeholder: 'http://localhost:3000/api/feishu/auth/callback',
+            help: 'OAuth回调地址'
+          }
+        ]
       }
     ];
 

@@ -366,6 +366,7 @@ app.use('/api/ai-cron', aiCronRouter);
 
 // Backup Management API Route
 app.use('/api/backup-management', backupManagementRouter);
+app.use('/api/services', servicesRouter);
 
 
 // --- Server Startup ---
