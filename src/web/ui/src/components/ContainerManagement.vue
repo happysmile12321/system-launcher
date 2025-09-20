@@ -65,7 +65,7 @@ import ImagesTab from './ImagesTab.vue';
 import CompositionsTab from './CompositionsTab.vue';
 
 // 响应式数据
-const activeTab = ref('containers');
+const activeTab = ref('compositions');
 const serviceStatus = ref({
   available: false,
   driver: null
@@ -73,6 +73,11 @@ const serviceStatus = ref({
 
 // 标签页配置
 const tabs = [
+  {
+    id: 'compositions',
+    name: '容器组',
+    icon: DatabaseIcon
+  },
   {
     id: 'containers',
     name: '容器',
@@ -82,11 +87,6 @@ const tabs = [
     id: 'images',
     name: '镜像',
     icon: ImageIcon
-  },
-  {
-    id: 'compositions',
-    name: '容器组',
-    icon: DatabaseIcon
   }
 ];
 

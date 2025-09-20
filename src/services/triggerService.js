@@ -293,6 +293,136 @@ class TriggerService {
   }
 
   /**
+   * 创建触发器（通用方法）
+   * @param {Object} triggerConfig - 触发器配置
+   * @returns {Object} - 创建的触发器信息
+   */
+  async createTrigger(triggerConfig) {
+    try {
+      const { type, workflowId, config, enabled = true } = triggerConfig;
+      
+      if (type === 'cron') {
+        const workflow = await getWorkflowById(workflowId);
+        if (!workflow) {
+          throw new Error('Workflow not found');
+        }
+        return await this.createCronTrigger(workflowId, config.cronExpression, workflow);
+      } else if (type === 'webhook') {
+        // 创建Webhook触发器
+        const webhookId = `webhook-${workflowId}-${Date.now()}`;
+        const webhookConfig = {
+          id: webhookId,
+          name: triggerConfig.name || `Webhook ${workflowId}`,
+          type: 'webhook',
+          workflowId,
+          config: {
+            path: config.path || `/webhook/${webhookId}`,
+            method: config.method || 'POST',
+            ...config
+          },
+          enabled,
+          createdAt: new Date()
+        };
+        
+        this.webhookHandlers.set(webhookId, webhookConfig);
+        
+        info(`Created webhook trigger: ${webhookId}`);
+        return webhookConfig;
+      } else {
+        throw new Error(`Unsupported trigger type: ${type}`);
+      }
+    } catch (err) {
+      error(`Failed to create trigger: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * 获取所有触发器
+   */
+  listTriggers() {
+    const triggers = [];
+    
+    // 添加Cron触发器
+    for (const [workflowId, trigger] of this.cronJobs) {
+      triggers.push({
+        id: workflowId,
+        name: `Cron ${workflowId}`,
+        type: 'cron',
+        workflowId,
+        config: {
+          cronExpression: trigger.cronExpression
+        },
+        enabled: true,
+        createdAt: trigger.createdAt
+      });
+    }
+    
+    // 添加Webhook触发器
+    for (const [webhookId, trigger] of this.webhookHandlers) {
+      triggers.push(trigger);
+    }
+    
+    return triggers;
+  }
+
+  /**
+   * 更新触发器
+   * @param {string} triggerId - 触发器ID
+   * @param {Object} updates - 更新内容
+   */
+  async updateTrigger(triggerId, updates) {
+    try {
+      // 检查是否是Cron触发器
+      if (this.cronJobs.has(triggerId)) {
+        if (updates.enabled === false) {
+          await this.removeCronTrigger(triggerId);
+        }
+        return { success: true };
+      }
+      
+      // 检查是否是Webhook触发器
+      if (this.webhookHandlers.has(triggerId)) {
+        const trigger = this.webhookHandlers.get(triggerId);
+        const updatedTrigger = { ...trigger, ...updates };
+        this.webhookHandlers.set(triggerId, updatedTrigger);
+        return updatedTrigger;
+      }
+      
+      throw new Error('Trigger not found');
+    } catch (err) {
+      error(`Failed to update trigger: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * 删除触发器
+   * @param {string} triggerId - 触发器ID
+   */
+  async deleteTrigger(triggerId) {
+    try {
+      // 检查是否是Cron触发器
+      if (this.cronJobs.has(triggerId)) {
+        await this.removeCronTrigger(triggerId);
+        return { success: true };
+      }
+      
+      // 检查是否是Webhook触发器
+      if (this.webhookHandlers.has(triggerId)) {
+        this.webhookHandlers.delete(triggerId);
+        info(`Deleted webhook trigger: ${triggerId}`);
+        return { success: true };
+      }
+      
+      throw new Error('Trigger not found');
+    } catch (err) {
+      error(`Failed to delete trigger: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
    * 清理所有触发器
    */
   async cleanup() {
@@ -317,4 +447,4 @@ class TriggerService {
 const triggerService = new TriggerService();
 
 export default triggerService;
-export { TriggerService };
+export { TriggerService, triggerService as createTrigger, triggerService as listTriggers, triggerService as updateTrigger, triggerService as deleteTrigger };

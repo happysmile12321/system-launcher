@@ -23,7 +23,7 @@
           </button>
           <button
             class="btn-primary"
-            @click="showComposeEditor = true"
+            @click="handleCreateClick"
           >
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -124,6 +124,12 @@
                       停止
                     </button>
                     <button
+                      class="action-btn proxy"
+                      @click="showCreateProxy(composition)"
+                    >
+                      创建代理
+                    </button>
+                    <button
                       class="action-btn delete"
                       @click="deleteComposition(composition)"
                     >
@@ -210,6 +216,13 @@
           <div class="editor-tabs">
             <button
               class="editor-tab"
+              :class="{ active: editorMode === 'form' }"
+              @click="editorMode = 'form'"
+            >
+              表单编辑器
+            </button>
+            <button
+              class="editor-tab"
               :class="{ active: editorMode === 'yaml' }"
               @click="editorMode = 'yaml'"
             >
@@ -225,8 +238,18 @@
           </div>
 
           <div class="editor-content">
+            <!-- 表单编辑器 -->
+            <div v-if="editorMode === 'form'" class="form-editor">
+              <FormDrivenEditor
+                :composition="editingComposition"
+                @close="showComposeEditor = false"
+                @save="handleFormSave"
+                @deploy="handleFormDeploy"
+              />
+            </div>
+
             <!-- YAML 编辑器 -->
-            <div v-if="editorMode === 'yaml'" class="yaml-editor">
+            <div v-else-if="editorMode === 'yaml'" class="yaml-editor">
               <MonacoEditor
                 v-model="composeContent"
                 language="yaml"
@@ -417,16 +440,38 @@
           </div>
         </div>
       </div>
+    <!-- 代理向导模态框 -->
+    <div v-if="showProxyWizard" class="modal-overlay" @click="closeProxyWizard">
+      <div class="modal-content proxy-modal" @click.stop>
+        <ProxyWizard
+          :composition-name="selectedService?.compositionName"
+          :service-name="selectedService?.serviceName"
+          :target-port="selectedService?.targetPort"
+          @close="closeProxyWizard"
+          @created="handleProxyCreated"
+        />
+      </div>
     </div>
+</div>
+ <!-- 容器组创建模态框 -->
+ <CompositionCreateModal
+      :show="showCreateModal"
+      @close="showCreateModal = false"
+      @saved="handleCompositionSaved"
+      @deployed="handleCompositionDeployed"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import MonacoEditor from './MonacoEditor.vue';
+import FormDrivenEditor from './FormDrivenEditor.vue';
+import ProxyWizard from './ProxyWizard.vue';
+import CompositionCreateModal from './CompositionCreateModal.vue';
 
 // 响应式数据
-const editorMode = ref('yaml');
+const editorMode = ref('form');
 const composeContent = ref('');
 const deploying = ref(false);
 const deployResult = ref(null);
@@ -438,6 +483,9 @@ const viewMode = ref('yaml');
 const editingComposition = ref(null);
 const viewingComposition = ref({});
 const compositions = ref([]);
+const showProxyWizard = ref(false);
+const selectedService = ref(null);
+const showCreateModal = ref(false);
 const visualServices = ref([
   {
     name: 'web',
@@ -831,10 +879,182 @@ function formatDate(dateString) {
   return date.toLocaleString();
 }
 
+// 处理表单保存
+async function handleFormSave(formData) {
+  saving.value = true;
+  try {
+    // 调用ComposeGeneratorService生成YAML
+    const response = await fetch('/api/local-fs/compositions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        compositionName: formData.name,
+        composeContent: generateYAMLFromForm(formData)
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showComposeEditor.value = false;
+      await fetchCompositions();
+      alert('保存成功！');
+    } else {
+      alert('保存失败：' + data.error);
+    }
+  } catch (error) {
+    alert('保存失败：' + error.message);
+  } finally {
+    saving.value = false;
+  }
+}
+
+// 处理表单部署
+async function handleFormDeploy(formData) {
+  deploying.value = true;
+  try {
+    // 先保存配置
+    await handleFormSave(formData);
+    
+    // 然后部署
+    const response = await fetch('/api/containers/compose/deploy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        composeContent: generateYAMLFromForm(formData),
+        projectName: formData.name
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      alert('部署成功！');
+    } else {
+      alert('部署失败：' + data.error);
+    }
+  } catch (error) {
+    alert('部署失败：' + error.message);
+  } finally {
+    deploying.value = false;
+  }
+}
+
+// 从表单数据生成YAML
+function generateYAMLFromForm(formData) {
+  let yaml = `version: '${formData.version}'\n\nservices:\n`;
+  
+  formData.services.forEach(service => {
+    if (service.name && service.image) {
+      yaml += `  ${service.name}:\n`;
+      yaml += `    image: ${service.image}\n`;
+      
+      if (service.ports && service.ports.some(p => p.host && p.container)) {
+        yaml += `    ports:\n`;
+        service.ports.forEach(port => {
+          if (port.host && port.container) {
+            yaml += `      - "${port.host}:${port.container}"\n`;
+          }
+        });
+      }
+      
+      if (service.environment && service.environment.some(e => e.key && e.value)) {
+        yaml += `    environment:\n`;
+        service.environment.forEach(env => {
+          if (env.key && env.value) {
+            yaml += `      - ${env.key}=${env.value}\n`;
+          }
+        });
+      }
+      
+      if (service.volumes && service.volumes.length > 0) {
+        yaml += `    volumes:\n`;
+        service.volumes.forEach(volume => {
+          if (volume.type === 'bind' && volume.containerPath) {
+            // 使用LocalFS规范生成路径
+            yaml += `      - ../../backup/${formData.name}/entitydata/${service.name}:${volume.containerPath}\n`;
+          } else if (volume.type === 'named' && volume.name && volume.containerPath) {
+            yaml += `      - ${formData.name}_${volume.name}:${volume.containerPath}\n`;
+          } else if (volume.type === 'direct' && volume.hostPath && volume.containerPath) {
+            yaml += `      - ${volume.hostPath}:${volume.containerPath}\n`;
+          }
+        });
+      }
+      
+      if (service.restart) {
+        yaml += `    restart: ${service.restart}\n`;
+      }
+      
+      if (service.containerName) {
+        yaml += `    container_name: ${service.containerName}\n`;
+      }
+      
+      if (service.dependsOn && service.dependsOn.length > 0) {
+        yaml += `    depends_on:\n`;
+        service.dependsOn.forEach(dep => {
+          if (dep) {
+            yaml += `      - ${dep}\n`;
+          }
+        });
+      }
+      
+      yaml += `\n`;
+    }
+  });
+  
+  return yaml.trim();
+}
+
+// 显示创建代理向导
+function showCreateProxy(composition) {
+  // 这里需要从容器组中获取服务信息
+  // 暂时使用模拟数据
+  selectedService.value = {
+    compositionName: composition.name,
+    serviceName: composition.services?.[0]?.name || 'web',
+    targetPort: parseInt(composition.services?.[0]?.ports?.split(':')[0]) || 80
+  };
+  showProxyWizard.value = true;
+}
+
+// 关闭代理向导
+function closeProxyWizard() {
+  showProxyWizard.value = false;
+  selectedService.value = null;
+}
+
+// 处理代理创建完成
+function handleProxyCreated(proxyData) {
+  closeProxyWizard();
+  alert(`代理创建成功！\nWebhook URL: ${proxyData.proxyUrl}`);
+}
+
+// 处理新建按钮点击
+function handleCreateClick() {
+  showCreateModal.value = true;
+}
+
+// 处理容器组保存
+function handleCompositionSaved(compositionData) {
+  showCreateModal.value = false;
+  fetchCompositions();
+  alert('容器组创建成功！');
+}
+
+// 处理容器组部署
+function handleCompositionDeployed(deployData) {
+  showCreateModal.value = false;
+  fetchCompositions();
+  alert('容器组部署成功！');
+}
+
 // 组件挂载时获取容器组列表
 onMounted(() => {
   fetchCompositions();
-  loadSampleCompose();
 });
 </script>
 
@@ -1044,6 +1264,10 @@ onMounted(() => {
   @apply bg-red-600 text-white hover:bg-red-700;
 }
 
+.action-btn.proxy {
+  @apply bg-purple-600 text-white hover:bg-purple-700;
+}
+
 .action-btn:disabled {
   @apply opacity-50 cursor-not-allowed;
 }
@@ -1059,6 +1283,10 @@ onMounted(() => {
 
 .view-modal {
   @apply max-w-6xl;
+}
+
+.proxy-modal {
+  @apply max-w-4xl;
 }
 
 .modal-header {

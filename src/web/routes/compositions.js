@@ -1,6 +1,8 @@
 import express from 'express';
 import { info, error, success } from '../../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
+import localFSService from '../../services/localFS.js';
+import composeGeneratorService from '../../services/composeGeneratorService.js';
 
 const router = express.Router();
 
@@ -91,9 +93,24 @@ router.get('/', async (req, res) => {
   try {
     info('Getting compositions list');
     
+    // 从LocalFS获取容器组列表
+    const localFSCompositions = await localFSService.listCompositions();
+    
+    // 转换为前端需要的格式
+    const formattedCompositions = localFSCompositions.map(comp => ({
+      id: comp.compositionName,
+      name: comp.compositionName,
+      description: 'Docker Compose项目',
+      content: '', // 可以从文件读取
+      status: 'stopped', // 可以从Docker状态获取
+      services: [], // 可以从compose文件解析
+      createdAt: comp.stats?.infra?.modified || new Date().toISOString(),
+      updatedAt: comp.stats?.infra?.modified || new Date().toISOString()
+    }));
+    
     res.json({
       success: true,
-      data: compositions
+      data: formattedCompositions
     });
   } catch (err) {
     error(`Failed to get compositions: ${err.message}`);
@@ -109,36 +126,54 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, content, description } = req.body;
+    const { name, content, description, formData } = req.body;
     
-    if (!name || !content) {
+    if (!name) {
       return res.status(400).json({
         success: false,
-        error: '名称和内容不能为空'
+        error: '名称不能为空'
       });
     }
 
-    // 解析服务信息
-    const services = parseServicesFromYaml(content);
+    let result;
     
-    const composition = {
-      id: uuidv4(),
-      name,
-      description: description || 'Docker Compose项目',
-      content,
-      status: 'stopped',
-      services,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    compositions.push(composition);
+    if (formData) {
+      // 使用表单数据创建容器组
+      result = await composeGeneratorService.generateComposeFromForm(formData, name);
+    } else if (content) {
+      // 使用YAML内容创建容器组
+      const structure = await localFSService.createCompositionStructure(name);
+      const composeFilePath = await localFSService.saveComposeFile(name, content);
+      
+      result = {
+        compositionName: name,
+        composeConfig: null,
+        yamlContent: content,
+        composeFilePath,
+        structure,
+        services: []
+      };
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: '内容或表单数据不能为空'
+      });
+    }
     
     success(`Created composition: ${name}`);
     
     res.json({
       success: true,
-      data: composition
+      data: {
+        id: result.compositionName,
+        name: result.compositionName,
+        description: description || 'Docker Compose项目',
+        content: result.yamlContent,
+        status: 'stopped',
+        services: result.services,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
     });
   } catch (err) {
     error(`Failed to create composition: ${err.message}`);
@@ -155,20 +190,41 @@ router.post('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const composition = compositions.find(c => c.id === id);
     
-    if (!composition) {
-      return res.status(404).json({
-        success: false,
-        error: '容器组不存在'
-      });
+    // 从LocalFS获取容器组结构
+    const structure = await localFSService.getCompositionStructure(id);
+    
+    // 读取Compose文件内容
+    let content = '';
+    try {
+      content = await localFSService.readComposeFile(id);
+    } catch (err) {
+      // Compose文件不存在，使用空内容
+      content = '';
     }
+    
+    const composition = {
+      id: structure.compositionName,
+      name: structure.compositionName,
+      description: 'Docker Compose项目',
+      content,
+      status: 'stopped', // 可以从Docker状态获取
+      services: [], // 可以从compose文件解析
+      createdAt: structure.stats?.infra?.modified || new Date().toISOString(),
+      updatedAt: structure.stats?.infra?.modified || new Date().toISOString()
+    };
 
     res.json({
       success: true,
       data: composition
     });
   } catch (err) {
+    if (err.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        error: '容器组不存在'
+      });
+    }
     error(`Failed to get composition: ${err.message}`);
     res.status(500).json({
       success: false,
@@ -227,25 +283,23 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const compositionIndex = compositions.findIndex(c => c.id === id);
     
-    if (compositionIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        error: '容器组不存在'
-      });
-    }
-
-    const composition = compositions[compositionIndex];
-    compositions.splice(compositionIndex, 1);
+    // 从LocalFS删除容器组
+    await localFSService.deleteComposition(id);
     
-    success(`Deleted composition: ${composition.name}`);
+    success(`Deleted composition: ${id}`);
     
     res.json({
       success: true,
       message: '容器组删除成功'
     });
   } catch (err) {
+    if (err.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        error: '容器组不存在'
+      });
+    }
     error(`Failed to delete composition: ${err.message}`);
     res.status(500).json({
       success: false,

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>按钮测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #1e293b;
+            color: white;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .btn-primary {
+            background-color: #0ea5e9;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .btn-primary:hover {
+            background-color: #0284c7;
+        }
+        .debug-info {
+            background-color: #374151;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>按钮点击测试</h1>
+        
+        <div class="debug-info">
+            <h3>调试信息：</h3>
+            <p>点击下面的按钮测试是否正常工作</p>
+        </div>
+        
+        <button class="btn-primary" onclick="testClick()">
+            测试按钮
+        </button>
+        
+        <button class="btn-primary" onclick="testModal()">
+            测试模态框
+        </button>
+        
+        <div id="result" class="debug-info" style="display: none;">
+            <h3>结果：</h3>
+            <p id="result-text"></p>
+        </div>
+    </div>
+
+    <script>
+        function testClick() {
+            console.log('按钮被点击了！');
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result-text').textContent = '按钮点击正常工作！';
+        }
+        
+        function testModal() {
+            console.log('模态框测试按钮被点击了！');
+            alert('模态框测试：按钮点击正常工作！');
+        }
+        
+        // 页面加载完成后的调试信息
+        window.addEventListener('load', function() {
+            console.log('页面加载完成');
+            console.log('Vue应用状态检查...');
+        });
+    </script>
+</body>
+</html>

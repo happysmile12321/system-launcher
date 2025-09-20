@@ -1,0 +1,80 @@
+{
+  "name": "container-proxy",
+  "version": "1.0.0",
+  "description": "容器反向代理组件 - 将HTTP请求代理到Docker网络内部的容器服务",
+  "type": "local",
+  "inputs": {
+    "compositionName": {
+      "type": "string",
+      "description": "容器组名称",
+      "required": true
+    },
+    "serviceName": {
+      "type": "string",
+      "description": "目标服务名称",
+      "required": true
+    },
+    "targetPort": {
+      "type": "number",
+      "description": "目标端口",
+      "required": true
+    },
+    "method": {
+      "type": "string",
+      "description": "HTTP方法",
+      "default": "GET",
+      "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+    },
+    "path": {
+      "type": "string",
+      "description": "请求路径",
+      "default": "/"
+    },
+    "headers": {
+      "type": "object",
+      "description": "请求头",
+      "default": {}
+    },
+    "body": {
+      "type": "string",
+      "description": "请求体",
+      "default": ""
+    },
+    "timeout": {
+      "type": "number",
+      "description": "超时时间(毫秒)",
+      "default": 30000
+    },
+    "followRedirects": {
+      "type": "boolean",
+      "description": "是否跟随重定向",
+      "default": true
+    }
+  },
+  "outputs": {
+    "success": {
+      "type": "boolean",
+      "description": "是否请求成功"
+    },
+    "statusCode": {
+      "type": "number",
+      "description": "HTTP状态码"
+    },
+    "headers": {
+      "type": "object",
+      "description": "响应头"
+    },
+    "body": {
+      "type": "string",
+      "description": "响应体"
+    },
+    "error": {
+      "type": "string",
+      "description": "错误信息"
+    },
+    "duration": {
+      "type": "number",
+      "description": "请求持续时间(毫秒)"
+    }
+  }
+}
