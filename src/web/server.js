@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { loadConfig, saveConfig, isConfigured, getConfig } from '../services/configService.js';
+import { loadConfig, saveConfig, isConfigured, getConfig, isFullyConfigured } from '../services/configService.js';
 import { getGitHubConfig, saveGitHubConfig } from '../services/githubService.js';
 import { runDockerDeploy } from '../core/deployment.js';
 import { info, success, error, warning } from '../utils/logger.js';
@@ -42,9 +42,24 @@ app.use(async (req, res, next) => {
   if (req.path.startsWith('/setup') || req.path.startsWith('/api/setup')) {
     return next(); // Allow access to setup page and API
   }
+
+  // 检查基本配置
   if (!isConfigured()) {
     return res.redirect('/setup');
   }
+
+  // 检查token有效性
+  try {
+    const fullyConfigured = await isFullyConfigured();
+    if (!fullyConfigured) {
+      warning('GitHub token is invalid, redirecting to setup page');
+      return res.redirect('/setup?error=invalid_token');
+    }
+  } catch (err) {
+    warning(`Token validation failed: ${err.message}`);
+    return res.redirect('/setup?error=validation_failed');
+  }
+
   next();
 });
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
@@ -69,9 +84,19 @@ app.post('/api/setup', async (req, res) => {
   try {
     await saveConfig(req.body);
     // Re-initialize services with the new config
-    await loadConfig(); 
-    success('Configuration saved!');
-    res.json({ message: 'Configuration saved successfully!' });
+    await loadConfig();
+
+    // Validate the new configuration
+    const configValid = await isFullyConfigured();
+    if (!configValid) {
+      error('Saved configuration is invalid - GitHub token validation failed');
+      return res.status(400).json({
+        error: 'GitHub token is invalid or repository access denied. Please check your credentials.'
+      });
+    }
+
+    success('Configuration saved and validated!');
+    res.json({ message: 'Configuration saved and validated successfully!' });
   } catch (e) {
     error('Failed to save configuration: ' + e.message);
     res.status(500).json({ error: 'Failed to save configuration.' });
@@ -84,7 +109,7 @@ app.get('/api/orchestration', async (req, res) => {
     const config = getConfig();
     const gitfs = new GitFS(config);
     const orchestrationPath = 'config/main.json';
-    
+
     const fileData = await gitfs.readFile(orchestrationPath);
     if (fileData) {
       res.json(JSON.parse(fileData.content));
@@ -104,16 +129,16 @@ app.post('/api/orchestration', async (req, res) => {
     const config = getConfig();
     const gitfs = new GitFS(config);
     const orchestrationPath = 'config/main.json';
-    
+
     // Ensure the config directory exists
     await gitfs.createDirectory('config');
-    
+
     await gitfs.writeFile(
-      orchestrationPath, 
+      orchestrationPath,
       JSON.stringify(req.body, null, 2),
       'Update orchestration configuration'
     );
-    
+
     res.json({ message: 'Orchestration saved to GitHub successfully!' });
   } catch (e) {
     error('Failed to save orchestration config: ' + e.message);
@@ -194,7 +219,7 @@ app.get('/api/scripts', async (req, res) => {
     const config = getConfig();
     const gitfs = new GitFS(config);
     const scriptsDir = 'scripts';
-    
+
     const items = await gitfs.listDirectory(scriptsDir);
     const scripts = items
       .filter(item => item.type === 'file' && item.name.endsWith('.js'))
@@ -202,7 +227,7 @@ app.get('/api/scripts', async (req, res) => {
         name: item.name,
         path: item.path.replace('.orchestrator-pro/', '')
       }));
-    
+
     res.json(scripts);
   } catch (e) {
     error('Failed to get scripts: ' + e.message);
@@ -216,7 +241,7 @@ app.get('/api/scripts/:scriptName', async (req, res) => {
     const config = getConfig();
     const gitfs = new GitFS(config);
     const scriptPath = `scripts/${req.params.scriptName}`;
-    
+
     const fileData = await gitfs.readFile(scriptPath);
     if (fileData) {
       res.json({ content: fileData.content });
@@ -235,16 +260,16 @@ app.post('/api/scripts/:scriptName', async (req, res) => {
     const config = getConfig();
     const gitfs = new GitFS(config);
     const scriptPath = `scripts/${req.params.scriptName}`;
-    
+
     // Ensure the scripts directory exists
     await gitfs.createDirectory('scripts');
-    
+
     await gitfs.writeFile(
-      scriptPath, 
+      scriptPath,
       req.body.content,
       `Update script: ${req.params.scriptName}`
     );
-    
+
     res.json({ message: 'Script saved successfully!' });
   } catch (e) {
     error('Failed to save script: ' + e.message);
@@ -258,12 +283,12 @@ app.delete('/api/scripts/:scriptName', async (req, res) => {
     const config = getConfig();
     const gitfs = new GitFS(config);
     const scriptPath = `scripts/${req.params.scriptName}`;
-    
+
     await gitfs.deleteFile(
       scriptPath,
       `Delete script: ${req.params.scriptName}`
     );
-    
+
     res.json({ message: 'Script deleted successfully!' });
   } catch (e) {
     error('Failed to delete script: ' + e.message);
@@ -277,9 +302,9 @@ app.post('/api/scripts/:scriptName/run', async (req, res) => {
     const config = getConfig();
     const scriptRunner = new ScriptRunner(config);
     const scriptPath = `scripts/${req.params.scriptName}`;
-    
+
     const result = await scriptRunner.runScriptFromPath(scriptPath);
-    
+
     if (result.error) {
       res.status(500).json({
         message: 'Script execution failed',
@@ -296,9 +321,9 @@ app.post('/api/scripts/:scriptName/run', async (req, res) => {
     }
   } catch (e) {
     error('Failed to run script: ' + e.message);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to run script.',
-      logs: [`[ERROR] ${e.message}`] 
+      logs: [`[ERROR] ${e.message}`]
     });
   }
 });
@@ -325,7 +350,7 @@ app.post('/api/scheduler/update', async (req, res) => {
     if (!cronExpression) {
       return res.status(400).json({ error: 'cronExpression is required.' });
     }
-    
+
     const updatedJob = await updateSchedulerConfig(cronExpression);
     res.json({
       message: 'Scheduler configuration updated successfully!',
@@ -373,17 +398,31 @@ app.use('/api/compositions', compositionsRouter);
 // --- Server Startup ---
 async function startServer() {
   await loadConfig();
-  
-  // Initialize necessary directories if configured
+
+  // Check if configuration is valid
+  let configValid = false;
   if (isConfigured()) {
+    try {
+      configValid = await isFullyConfigured();
+      if (!configValid) {
+        warning('GitHub token is invalid, configuration needs to be updated');
+      }
+    } catch (err) {
+      warning(`Token validation failed during startup: ${err.message}`);
+      configValid = false;
+    }
+  }
+
+  // Initialize necessary directories if configured and valid
+  if (configValid) {
     try {
       const config = getConfig();
       const gitfs = new GitFS(config);
-      
+
       // V3.0: Initialize new directory structure and migrate if needed
       try {
         await gitfs.initializeV3Structure();
-        
+
         // Check if migration is needed
         const oldConfigExists = await gitfs.exists('config');
         if (oldConfigExists) {
@@ -393,74 +432,76 @@ async function startServer() {
       } catch (migrationError) {
         warning(`V3.0: Migration failed, continuing with existing structure: ${migrationError.message}`);
       }
-      
+
       // Ensure basic directory structure exists (legacy support)
       await gitfs.createDirectory('config');
       await gitfs.createDirectory('scripts');
-  
-  // Ensure main orchestration file exists
-  const orchestrationPath = 'config/main.json';
-  const orchestrationExists = await gitfs.exists(orchestrationPath);
-  if (!orchestrationExists) {
-    await gitfs.writeFile(
-      orchestrationPath, 
-      JSON.stringify({ version: 1, steps: [] }, null, 2),
-      'Initialize orchestration configuration'
-    );
-  }
-  
-  // 启动定时任务服务
-  try {
-    await startScheduler();
-  } catch (schedulerError) {
-    warning(`定时任务服务启动失败: ${schedulerError.message}`);
-  }
 
-  // 初始化容器备份服务
-  try {
-    const triggerService = (await import('../services/triggerService.js')).default;
-    const componentService = (await import('../services/componentService.js')).default;
-    
-    // workflowService 导出的是函数，我们创建一个包装对象
-    const workflowService = {
-      createWorkflow: (await import('../services/workflowService.js')).createWorkflow,
-      getAllWorkflows: async () => {
-        const workflows = await (await import('../services/workflowService.js')).listWorkflows();
-        return { workflows };
-      },
-      getWorkflow: (await import('../services/workflowService.js')).getWorkflow,
-      saveWorkflow: (await import('../services/workflowService.js')).saveWorkflow,
-      deleteWorkflow: (await import('../services/workflowService.js')).deleteWorkflow
-    };
-    
-    initializeContainerBackupService(workflowService, triggerService, componentService);
-    info('容器备份服务初始化完成');
-  } catch (backupServiceError) {
-    warning(`容器备份服务初始化失败: ${backupServiceError.message}`);
-  }
+      // Ensure main orchestration file exists
+      const orchestrationPath = 'config/main.json';
+      const orchestrationExists = await gitfs.exists(orchestrationPath);
+      if (!orchestrationExists) {
+        await gitfs.writeFile(
+          orchestrationPath,
+          JSON.stringify({ version: 1, steps: [] }, null, 2),
+          'Initialize orchestration configuration'
+        );
+      }
 
-  // 启动飞书WebSocket服务
-  try {
-    const webSocketStarted = await feishuWebSocketService.start();
-    if (webSocketStarted) {
-      info('飞书WebSocket服务启动成功');
-    } else {
-      warning('飞书WebSocket服务启动失败，请检查飞书配置');
-    }
-  } catch (webSocketError) {
-    warning(`飞书WebSocket服务启动失败: ${webSocketError.message}`);
-  }
+      // 启动定时任务服务
+      try {
+        await startScheduler();
+      } catch (schedulerError) {
+        warning(`定时任务服务启动失败: ${schedulerError.message}`);
+      }
+
+      // 初始化容器备份服务
+      try {
+        const triggerService = (await import('../services/triggerService.js')).default;
+        const componentService = (await import('../services/componentService.js')).default;
+
+        // workflowService 导出的是函数，我们创建一个包装对象
+        const workflowService = {
+          createWorkflow: (await import('../services/workflowService.js')).createWorkflow,
+          getAllWorkflows: async () => {
+            const workflows = await (await import('../services/workflowService.js')).listWorkflows();
+            return { workflows };
+          },
+          getWorkflow: (await import('../services/workflowService.js')).getWorkflow,
+          saveWorkflow: (await import('../services/workflowService.js')).saveWorkflow,
+          deleteWorkflow: (await import('../services/workflowService.js')).deleteWorkflow
+        };
+
+        initializeContainerBackupService(workflowService, triggerService, componentService);
+        info('容器备份服务初始化完成');
+      } catch (backupServiceError) {
+        warning(`容器备份服务初始化失败: ${backupServiceError.message}`);
+      }
+
+      // 启动飞书WebSocket服务
+      try {
+        const webSocketStarted = await feishuWebSocketService.start();
+        if (webSocketStarted) {
+          info('飞书WebSocket服务启动成功');
+        } else {
+          warning('飞书WebSocket服务启动失败，请检查飞书配置');
+        }
+      } catch (webSocketError) {
+        warning(`飞书WebSocket服务启动失败: ${webSocketError.message}`);
+      }
     } catch (e) {
       warning(`Failed to initialize GitHub directories: ${e.message}`);
     }
   }
-  
+
   app.listen(PORT, () => {
     success(`Orchestrator Pro is running!`);
-    if (isConfigured()) {
+    if (configValid) {
       info(`Main application ready at http://localhost:${PORT}`);
+    } else if (isConfigured()) {
+      warning(`GitHub token is invalid. Please visit http://localhost:${PORT}/setup to update configuration.`);
     } else {
-      warning(`Configuration needed. Please visit http://localhost:${PORT} to complete setup.`);
+      warning(`Configuration needed. Please visit http://localhost:${PORT}/setup to complete setup.`);
     }
   });
 }

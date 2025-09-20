@@ -2,7 +2,7 @@ import GitFS from '../core/gitfs.js';
 import { getConfig } from './configService.js';
 import { info, error } from '../utils/logger.js';
 
-const WORKFLOW_DIR = 'config';
+const WORKFLOW_DIR = '.orchestrator-pro/workflows';
 const WORKFLOW_SUFFIX = '.workflow.json';
 
 function getWorkflowPath(id) {
@@ -36,12 +36,12 @@ async function getGitFsInstance() {
   if (!config) {
     throw new Error('Application is not configured.');
   }
-  
+
   // 检查GitHub配置
   if (!config.github?.token) {
     throw new Error('GitHub token is not configured. Please configure GitHub integration first.');
   }
-  
+
   return new GitFS(config);
 }
 

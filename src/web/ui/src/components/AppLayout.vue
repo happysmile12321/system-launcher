@@ -8,8 +8,8 @@
             <h1 class="mt-1 text-2xl font-semibold">可视化工作流设计器</h1>
           </div>
           <div class="text-right text-xs text-slate-400">
-            <p>UI 2.0 · 阶段一</p>
-            <p class="opacity-70">结构化配置 &amp; 核心骨架</p>
+            <p>UI 3.0 · 阶段一</p>
+            <p class="opacity-70">架构收敛 &amp; 核心骨架</p>
           </div>
         </div>
         <nav class="flex space-x-1">
