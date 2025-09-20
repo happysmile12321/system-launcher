@@ -90,10 +90,7 @@ router.post('/config', async (req, res) => {
       'Update Feishu configuration'
     );
     
-    // 更新环境变量（用于当前会话）
-    process.env.FEISHU_APP_ID = appId;
-    process.env.FEISHU_APP_SECRET = appSecret;
-    process.env.FEISHU_REDIRECT_URI = config.feishu.redirectUri;
+    // 配置已保存到GitFS，无需设置环境变量
     
     success('Feishu configuration saved to GitFS');
     

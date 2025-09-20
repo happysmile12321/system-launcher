@@ -1,0 +1,33 @@
+{
+  "name": "stop-container",
+  "version": "1.0.0",
+  "description": "停止容器",
+  "type": "local",
+  "inputs": {
+    "containerId": {
+      "type": "string",
+      "description": "容器ID或名称",
+      "required": true
+    },
+    "driver": {
+      "type": "string",
+      "description": "容器驱动 (docker/podman)",
+      "default": "docker"
+    },
+    "timeout": {
+      "type": "number",
+      "description": "停止超时时间(秒)",
+      "default": 10
+    }
+  },
+  "outputs": {
+    "success": {
+      "type": "boolean",
+      "description": "是否停止成功"
+    },
+    "message": {
+      "type": "string",
+      "description": "操作结果消息"
+    }
+  }
+}

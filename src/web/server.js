@@ -18,6 +18,7 @@ import servicesRouter from './routes/services.js';
 import containersRouter from './routes/containers.js';
 import containerBackupRouter, { initializeContainerBackupService } from './routes/containerBackup.js';
 import aiCronRouter from './routes/aiCron.js';
+import backupManagementRouter from './routes/backupManagement.js';
 import feishuWebSocketService from '../services/feishuWebSocketService.js';
 import {
   listWorkflows,
@@ -363,6 +364,9 @@ app.use('/api/container-backup', containerBackupRouter);
 // AI Cron API Route
 app.use('/api/ai-cron', aiCronRouter);
 
+// Backup Management API Route
+app.use('/api/backup-management', backupManagementRouter);
+
 
 // --- Server Startup ---
 async function startServer() {
@@ -374,9 +378,23 @@ async function startServer() {
       const config = getConfig();
       const gitfs = new GitFS(config);
       
-      // Ensure basic directory structure exists
-  await gitfs.createDirectory('config');
-  await gitfs.createDirectory('scripts');
+      // V3.0: Initialize new directory structure and migrate if needed
+      try {
+        await gitfs.initializeV3Structure();
+        
+        // Check if migration is needed
+        const oldConfigExists = await gitfs.exists('config');
+        if (oldConfigExists) {
+          info('V3.0: Old config structure detected, starting migration...');
+          await gitfs.migrateToV3();
+        }
+      } catch (migrationError) {
+        warning(`V3.0: Migration failed, continuing with existing structure: ${migrationError.message}`);
+      }
+      
+      // Ensure basic directory structure exists (legacy support)
+      await gitfs.createDirectory('config');
+      await gitfs.createDirectory('scripts');
   
   // Ensure main orchestration file exists
   const orchestrationPath = 'config/main.json';

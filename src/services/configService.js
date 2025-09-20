@@ -79,20 +79,9 @@ export async function getConfig() {
       if (feishuConfigFile) {
         const feishuConfig = JSON.parse(feishuConfigFile.content);
         config.feishu = feishuConfig;
-        
-        // 更新环境变量
-        if (feishuConfig.appId) {
-          process.env.FEISHU_APP_ID = feishuConfig.appId;
-        }
-        if (feishuConfig.appSecret) {
-          process.env.FEISHU_APP_SECRET = feishuConfig.appSecret;
-        }
-        if (feishuConfig.redirectUri) {
-          process.env.FEISHU_REDIRECT_URI = feishuConfig.redirectUri;
-        }
       }
     } catch (err) {
-      // 如果读取GitFS配置失败，忽略错误，使用环境变量
+      // 如果读取GitFS配置失败，忽略错误
       console.warn('Failed to load Feishu config from GitFS:', err.message);
     }
   }

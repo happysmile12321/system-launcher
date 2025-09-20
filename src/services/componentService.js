@@ -542,9 +542,9 @@ executeComponent();
   }
 
   /**
-   * 创建新的用户组件
+   * V3.0: 创建新的用户组件，支持公有/私有设置
    */
-  async createUserComponent(componentName, manifest, code) {
+  async createUserComponent(componentName, manifest, code, isPublic = false) {
     try {
       const config = getConfig();
       if (!config || !config.github) {
@@ -560,6 +560,9 @@ executeComponent();
         throw new Error('Invalid component manifest');
       }
 
+      // 添加公有/私有信息到清单
+      manifest.isPublic = isPublic;
+
       // 写入component.json
       await gitfs.writeFile(
         `${componentPath}/component.json`,
@@ -574,10 +577,13 @@ executeComponent();
         `Create component code for ${componentName}`
       );
 
+      // V3.0: 管理.gitignore文件
+      await this.updateGitignoreForComponent(componentName, isPublic);
+
       // 刷新组件列表
       await this.refresh();
 
-      success(`Created user component: ${componentName}`);
+      success(`Created user component: ${componentName} (${isPublic ? 'public' : 'private'})`);
       return true;
     } catch (err) {
       error(`Failed to create user component ${componentName}: ${err.message}`);
@@ -586,11 +592,11 @@ executeComponent();
   }
 
   /**
-   * 更新用户组件
+   * V3.0: 更新用户组件，支持公有/私有设置
    */
-  async updateUserComponent(componentName, manifest, code) {
+  async updateUserComponent(componentName, manifest, code, isPublic = false) {
     try {
-      return await this.createUserComponent(componentName, manifest, code);
+      return await this.createUserComponent(componentName, manifest, code, isPublic);
     } catch (err) {
       error(`Failed to update user component ${componentName}: ${err.message}`);
       throw err;
@@ -622,10 +628,180 @@ executeComponent();
       // 刷新组件列表
       await this.refresh();
 
+      // V3.0: 从.gitignore中移除组件路径
+      await this.removeComponentFromGitignore(componentName);
+
       success(`Deleted user component: ${componentName}`);
       return true;
     } catch (err) {
       error(`Failed to delete user component ${componentName}: ${err.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * V3.0: 更新.gitignore文件以支持组件公有/私有设置
+   */
+  async updateGitignoreForComponent(componentName, isPublic) {
+    try {
+      const config = getConfig();
+      if (!config || !config.github) {
+        return; // 如果没有GitHub配置，跳过.gitignore更新
+      }
+
+      const gitfs = new GitFS(config);
+      const gitignorePath = '.gitignore';
+      const componentPath = `components/${componentName}/`;
+
+      // 读取现有的.gitignore文件
+      let gitignoreContent = '';
+      try {
+        const gitignoreFile = await gitfs.readFile(gitignorePath);
+        if (gitignoreFile) {
+          gitignoreContent = gitignoreFile.content;
+        }
+      } catch (err) {
+        // .gitignore文件不存在，创建新的
+        gitignoreContent = '';
+      }
+
+      // 解析.gitignore内容
+      const lines = gitignoreContent.split('\n');
+      const newLines = [];
+      let componentLineFound = false;
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        // 检查是否已经存在该组件的忽略规则
+        if (trimmedLine === componentPath) {
+          componentLineFound = true;
+          // 如果是公有组件，不添加忽略规则
+          if (!isPublic) {
+            newLines.push(line);
+          }
+        } else {
+          newLines.push(line);
+        }
+      }
+
+      // 如果是私有组件且没有找到忽略规则，添加它
+      if (!isPublic && !componentLineFound) {
+        newLines.push(componentPath);
+      }
+
+      // 确保有适当的注释
+      if (!isPublic && !componentLineFound) {
+        // 检查是否需要添加注释
+        const hasComponentComment = newLines.some(line => 
+          line.includes('# User components') || line.includes('# Components')
+        );
+        
+        if (!hasComponentComment) {
+          newLines.push('');
+          newLines.push('# User components');
+        }
+      }
+
+      // 写入更新后的.gitignore文件
+      const newContent = newLines.join('\n');
+      await gitfs.writeFile(
+        gitignorePath,
+        newContent,
+        `V3.0: Update .gitignore for component ${componentName} (${isPublic ? 'public' : 'private'})`
+      );
+
+      info(`Updated .gitignore for component ${componentName} (${isPublic ? 'public' : 'private'})`);
+
+    } catch (err) {
+      warning(`Failed to update .gitignore for component ${componentName}: ${err.message}`);
+      // 不抛出错误，因为.gitignore更新失败不应该阻止组件创建
+    }
+  }
+
+  /**
+   * V3.0: 从.gitignore中移除组件路径
+   */
+  async removeComponentFromGitignore(componentName) {
+    try {
+      const config = getConfig();
+      if (!config || !config.github) {
+        return; // 如果没有GitHub配置，跳过.gitignore更新
+      }
+
+      const gitfs = new GitFS(config);
+      const gitignorePath = '.gitignore';
+      const componentPath = `components/${componentName}/`;
+
+      // 读取现有的.gitignore文件
+      let gitignoreContent = '';
+      try {
+        const gitignoreFile = await gitfs.readFile(gitignorePath);
+        if (gitignoreFile) {
+          gitignoreContent = gitignoreFile.content;
+        }
+      } catch (err) {
+        // .gitignore文件不存在，无需处理
+        return;
+      }
+
+      // 移除组件路径
+      const lines = gitignoreContent.split('\n');
+      const newLines = lines.filter(line => line.trim() !== componentPath);
+
+      // 写入更新后的.gitignore文件
+      const newContent = newLines.join('\n');
+      await gitfs.writeFile(
+        gitignorePath,
+        newContent,
+        `V3.0: Remove component ${componentName} from .gitignore`
+      );
+
+      info(`Removed component ${componentName} from .gitignore`);
+
+    } catch (err) {
+      warning(`Failed to remove component ${componentName} from .gitignore: ${err.message}`);
+      // 不抛出错误，因为.gitignore更新失败不应该阻止组件删除
+    }
+  }
+
+  /**
+   * V3.0: 获取组件的公有/私有状态
+   */
+  async getComponentVisibility(componentName) {
+    try {
+      const component = await this.getComponent('user', componentName);
+      if (component && component.manifest) {
+        return component.manifest.isPublic || false;
+      }
+      return false;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /**
+   * V3.0: 设置组件的公有/私有状态
+   */
+  async setComponentVisibility(componentName, isPublic) {
+    try {
+      const component = await this.getComponent('user', componentName);
+      if (!component) {
+        throw new Error(`Component ${componentName} not found`);
+      }
+
+      // 更新组件清单
+      const manifest = component.manifest;
+      manifest.isPublic = isPublic;
+
+      // 更新组件
+      await this.updateUserComponent(componentName, manifest, component.code, isPublic);
+
+      success(`Set component ${componentName} visibility to ${isPublic ? 'public' : 'private'}`);
+      return true;
+
+    } catch (err) {
+      error(`Failed to set component visibility: ${err.message}`);
       throw err;
     }
   }

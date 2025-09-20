@@ -39,7 +39,7 @@
             :class="activeTab === 'database' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
             @click="activeTab = 'database'"
           >
-            数据库管理
+            备份管理
           </button>
           <button 
             class="rounded-lg px-4 py-2 text-sm font-medium transition" 
@@ -53,7 +53,7 @@
             :class="activeTab === 'settings' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'"
             @click="activeTab = 'settings'"
           >
-            设置
+            系统服务
           </button>
         </nav>
       </div>
@@ -598,7 +598,7 @@
         </div>
       </template>
 
-      <!-- 数据库管理页面 -->
+      <!-- 备份管理页面 -->
       <template v-else-if="activeTab === 'database'">
         <div class="space-y-6">
           <!-- 飞书文件管理 -->
@@ -967,7 +967,7 @@
         </div>
       </template>
 
-      <!-- 设置页面 -->
+      <!-- 系统服务页面 -->
       <template v-else-if="activeTab === 'settings'">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur">
           <SystemServices />
@@ -1416,7 +1416,7 @@ const currentComponentType = ref('');
 const showSystemComponents = ref(true);
 const showUserComponents = ref(true);
 
-// 数据库管理相关状态
+// 备份管理相关状态
 const feishuAuthStatus = ref({ authenticated: false, user: null });
 const feishuConfigStatus = ref({ configured: false, hasAppId: false, hasAppSecret: false });
 const feishuFiles = ref([]);
@@ -1936,7 +1936,7 @@ async function fetchComponents() {
   }
 }
 
-// 数据库管理相关方法
+// 备份管理相关方法
 async function checkFeishuAuthStatus() {
   try {
     const res = await fetch('/api/feishu/auth/status');

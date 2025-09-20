@@ -22,12 +22,37 @@ class GitFS {
 
   /**
    * 获取完整路径，添加专属命名空间前缀
+   * V3.0: 支持新的目录结构
    */
   getFullPath(path) {
     if (path.startsWith(this.baseDir)) {
       return path;
     }
     return `${this.baseDir}/${path}`;
+  }
+
+  /**
+   * V3.0: 获取新的目录结构路径
+   * 支持 workflows/, components/, triggers/, containers/, feishu/, system_services/, backups/, recovery/
+   */
+  getV3Path(type, path = '') {
+    const v3Paths = {
+      workflows: 'workflows',
+      components: 'components', 
+      triggers: 'triggers',
+      containers: 'containers',
+      feishu: 'feishu',
+      system_services: 'system_services',
+      backups: 'backups',
+      recovery: 'recovery'
+    };
+    
+    if (!v3Paths[type]) {
+      throw new Error(`Unknown V3 path type: ${type}`);
+    }
+    
+    const basePath = v3Paths[type];
+    return path ? `${basePath}/${path}` : basePath;
   }
 
   /**
@@ -226,6 +251,104 @@ class GitFS {
       if (err.status === 404) {
         return false;
       }
+      throw err;
+    }
+  }
+
+  /**
+   * V3.0: 初始化新的目录结构
+   */
+  async initializeV3Structure() {
+    const v3Directories = [
+      'workflows',
+      'components', 
+      'triggers',
+      'containers',
+      'feishu',
+      'system_services',
+      'backups',
+      'recovery'
+    ];
+
+    for (const dir of v3Directories) {
+      try {
+        await this.createDirectory(dir, `V3.0: Initialize ${dir} directory`);
+        info(`V3.0: Created directory ${dir}`);
+      } catch (err) {
+        if (!err.message.includes('already exists')) {
+          warning(`V3.0: Failed to create directory ${dir}: ${err.message}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * V3.0: 迁移旧配置到新结构
+   */
+  async migrateToV3() {
+    info('V3.0: Starting migration from old config structure...');
+    
+    try {
+      // 迁移工作流配置
+      const oldWorkflowsPath = 'config/workflows';
+      const newWorkflowsPath = this.getV3Path('workflows');
+      
+      if (await this.exists(oldWorkflowsPath)) {
+        const workflows = await this.listDirectory(oldWorkflowsPath);
+        for (const workflow of workflows) {
+          if (workflow.type === 'file' && workflow.name.endsWith('.json')) {
+            const content = await this.readFile(`${oldWorkflowsPath}/${workflow.name}`);
+            await this.writeFile(
+              `${newWorkflowsPath}/${workflow.name}`,
+              content.content,
+              `V3.0: Migrate workflow ${workflow.name}`
+            );
+          }
+        }
+        success('V3.0: Migrated workflows to new structure');
+      }
+
+      // 迁移触发器配置
+      const oldTriggersPath = 'config/triggers';
+      const newTriggersPath = this.getV3Path('triggers');
+      
+      if (await this.exists(oldTriggersPath)) {
+        const triggers = await this.listDirectory(oldTriggersPath);
+        for (const trigger of triggers) {
+          if (trigger.type === 'file' && trigger.name.endsWith('.json')) {
+            const content = await this.readFile(`${oldTriggersPath}/${trigger.name}`);
+            await this.writeFile(
+              `${newTriggersPath}/${trigger.name}`,
+              content.content,
+              `V3.0: Migrate trigger ${trigger.name}`
+            );
+          }
+        }
+        success('V3.0: Migrated triggers to new structure');
+      }
+
+      // 迁移系统服务配置
+      const oldServicesPath = 'config/services';
+      const newServicesPath = this.getV3Path('system_services');
+      
+      if (await this.exists(oldServicesPath)) {
+        const services = await this.listDirectory(oldServicesPath);
+        for (const service of services) {
+          if (service.type === 'file' && service.name.endsWith('.json')) {
+            const content = await this.readFile(`${oldServicesPath}/${service.name}`);
+            await this.writeFile(
+              `${newServicesPath}/${service.name}`,
+              content.content,
+              `V3.0: Migrate service ${service.name}`
+            );
+          }
+        }
+        success('V3.0: Migrated system services to new structure');
+      }
+
+      success('V3.0: Migration completed successfully');
+    } catch (err) {
+      error(`V3.0: Migration failed: ${err.message}`);
       throw err;
     }
   }

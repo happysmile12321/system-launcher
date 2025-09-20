@@ -1,6 +1,5 @@
 
 import { getConfig } from '../../services/configService.js';
-import PodmanDriver from './drivers/podman.js';
 import DockerDriver from './drivers/docker.js';
 
 let containerDriver;
@@ -14,9 +13,6 @@ function getDriver() {
     const driverType = config.container?.driver || 'docker'; // Default to docker
 
     switch (driverType) {
-        case 'podman':
-            containerDriver = new PodmanDriver(config.container.podman);
-            break;
         case 'docker':
         default:
             containerDriver = new DockerDriver(config.container.docker);

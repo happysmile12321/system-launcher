@@ -82,11 +82,11 @@ router.post('/execute/:type/:name', async (req, res) => {
 });
 
 /**
- * 创建用户组件
+ * V3.0: 创建用户组件，支持公有/私有设置
  */
 router.post('/user', async (req, res) => {
   try {
-    const { name, manifest, code } = req.body;
+    const { name, manifest, code, isPublic = false } = req.body;
     
     if (!name || !manifest || !code) {
       res.status(400).json({
@@ -96,12 +96,12 @@ router.post('/user', async (req, res) => {
       return;
     }
     
-    info(`创建用户组件: ${name}`);
-    await componentService.createUserComponent(name, manifest, code);
+    info(`创建用户组件: ${name} (${isPublic ? 'public' : 'private'})`);
+    await componentService.createUserComponent(name, manifest, code, isPublic);
     
     res.json({
       success: true,
-      message: '组件创建成功'
+      message: `组件创建成功 (${isPublic ? '公有' : '私有'})`
     });
   } catch (err) {
     error(`创建用户组件失败: ${err.message}`);
@@ -113,12 +113,12 @@ router.post('/user', async (req, res) => {
 });
 
 /**
- * 更新用户组件
+ * V3.0: 更新用户组件，支持公有/私有设置
  */
 router.put('/user/:name', async (req, res) => {
   try {
     const { name } = req.params;
-    const { manifest, code } = req.body;
+    const { manifest, code, isPublic = false } = req.body;
     
     if (!manifest || !code) {
       res.status(400).json({
@@ -128,12 +128,12 @@ router.put('/user/:name', async (req, res) => {
       return;
     }
     
-    info(`更新用户组件: ${name}`);
-    await componentService.updateUserComponent(name, manifest, code);
+    info(`更新用户组件: ${name} (${isPublic ? 'public' : 'private'})`);
+    await componentService.updateUserComponent(name, manifest, code, isPublic);
     
     res.json({
       success: true,
-      message: '组件更新成功'
+      message: `组件更新成功 (${isPublic ? '公有' : '私有'})`
     });
   } catch (err) {
     error(`更新用户组件失败: ${err.message}`);
@@ -181,6 +181,64 @@ router.post('/refresh', async (req, res) => {
     });
   } catch (err) {
     error(`刷新组件列表失败: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * V3.0: 获取组件可见性状态
+ */
+router.get('/user/:name/visibility', async (req, res) => {
+  try {
+    const { name } = req.params;
+    info(`获取组件可见性: ${name}`);
+    
+    const isPublic = await componentService.getComponentVisibility(name);
+    
+    res.json({
+      success: true,
+      data: {
+        componentName: name,
+        isPublic: isPublic
+      }
+    });
+  } catch (err) {
+    error(`获取组件可见性失败: ${err.message}`);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * V3.0: 设置组件可见性
+ */
+router.put('/user/:name/visibility', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { isPublic } = req.body;
+    
+    if (typeof isPublic !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        error: 'isPublic must be a boolean value'
+      });
+      return;
+    }
+    
+    info(`设置组件可见性: ${name} -> ${isPublic ? 'public' : 'private'}`);
+    await componentService.setComponentVisibility(name, isPublic);
+    
+    res.json({
+      success: true,
+      message: `组件可见性已设置为 ${isPublic ? '公有' : '私有'}`
+    });
+  } catch (err) {
+    error(`设置组件可见性失败: ${err.message}`);
     res.status(500).json({
       success: false,
       error: err.message

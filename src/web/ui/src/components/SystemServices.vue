@@ -4,7 +4,7 @@
       <div class="flex items-center justify-between">
         <div>
           <h2 class="text-lg font-semibold text-slate-100">系统服务</h2>
-          <p class="text-sm text-slate-400 mt-1">管理可插拔的系统级扩展模块</p>
+          <p class="text-sm text-slate-400 mt-1">配置内置核心服务，提供平台基础能力</p>
         </div>
       </div>
     </div>
@@ -20,7 +20,7 @@
         
         <div v-else class="services-grid">
           <div
-            v-for="service in availableServices"
+            v-for="service in systemServices"
             :key="service.id"
             class="service-card"
           >
@@ -34,41 +34,31 @@
               </div>
               <div class="service-status">
                 <span class="status-badge"
-                      :class="service.installed ? 'installed' : 'not-installed'">
-                  {{ service.installed ? '已安装' : '未安装' }}
+                      :class="service.configured ? 'configured' : 'not-configured'">
+                  {{ service.configured ? '已配置' : '未配置' }}
                 </span>
               </div>
             </div>
             
             <div class="service-details">
               <div class="detail-item">
-                <span class="text-xs text-slate-400">版本</span>
-                <span class="text-xs text-slate-200">{{ service.version }}</span>
+                <span class="text-xs text-slate-400">类型</span>
+                <span class="text-xs text-slate-200">{{ service.type }}</span>
               </div>
               <div class="detail-item">
-                <span class="text-xs text-slate-400">依赖</span>
-                <span class="text-xs text-slate-200">{{ service.dependencies.join(', ') || '无' }}</span>
+                <span class="text-xs text-slate-400">状态</span>
+                <span class="text-xs text-slate-200">{{ service.status }}</span>
               </div>
             </div>
             
             <div class="service-actions">
               <button
-                v-if="!service.installed"
-                class="install-btn"
-                :disabled="service.installing"
-                @click="installService(service)"
+                class="configure-btn"
+                :disabled="service.configuring"
+                @click="configureService(service)"
               >
-                <div v-if="service.installing" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                {{ service.installing ? '安装中...' : '安装' }}
-              </button>
-              <button
-                v-else
-                class="uninstall-btn"
-                :disabled="service.uninstalling"
-                @click="uninstallService(service)"
-              >
-                <div v-if="service.uninstalling" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                {{ service.uninstalling ? '卸载中...' : '卸载' }}
+                <div v-if="service.configuring" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                {{ service.configuring ? '配置中...' : '配置' }}
               </button>
             </div>
           </div>
@@ -77,12 +67,12 @@
 
     </div>
 
-    <!-- 安装确认模态框 -->
-    <div v-if="showInstallModal" class="modal-overlay" @click="closeInstallModal">
+    <!-- 配置模态框 -->
+    <div v-if="showConfigModal" class="modal-overlay" @click="closeConfigModal">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3 class="text-lg font-semibold text-slate-100">安装系统服务</h3>
-          <button class="modal-close" @click="closeInstallModal">
+          <h3 class="text-lg font-semibold text-slate-100">配置系统服务</h3>
+          <button class="modal-close" @click="closeConfigModal">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -98,44 +88,47 @@
               <p class="text-sm text-slate-400 text-center mb-4">{{ selectedService.description }}</p>
             </div>
             
-            <div v-if="selectedService.dependencies.length > 0" class="dependencies">
-              <h5 class="text-sm font-medium text-slate-300 mb-2">依赖检查</h5>
-              <div class="dependency-list">
-                <div
-                  v-for="dep in selectedService.dependencies"
-                  :key="dep"
-                  class="dependency-item"
+            <!-- 动态配置表单 -->
+            <div class="config-form">
+              <div v-for="field in selectedService.configFields" :key="field.name" class="form-field">
+                <label class="form-label">{{ field.label }}</label>
+                <input
+                  v-if="field.type === 'text' || field.type === 'password'"
+                  :type="field.type"
+                  v-model="configData[field.name]"
+                  :placeholder="field.placeholder"
+                  class="form-input"
+                />
+                <select
+                  v-else-if="field.type === 'select'"
+                  v-model="configData[field.name]"
+                  class="form-input"
                 >
-                  <span class="text-sm text-slate-200">{{ dep }}</span>
-                  <span class="text-xs"
-                        :class="dependencyStatus[dep] ? 'text-emerald-400' : 'text-red-400'">
-                    {{ dependencyStatus[dep] ? '✓ 已安装' : '✗ 未安装' }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            <div v-if="!allDependenciesMet" class="warning">
-              <div class="flex items-center gap-2 text-amber-300">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                  <line x1="12" y1="9" x2="12" y2="13"></line>
-                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-                <span class="text-sm">请先安装所需的依赖</span>
+                  <option v-for="option in field.options" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+                <textarea
+                  v-else-if="field.type === 'textarea'"
+                  v-model="configData[field.name]"
+                  :placeholder="field.placeholder"
+                  class="form-input"
+                  rows="3"
+                ></textarea>
+                <p v-if="field.help" class="form-help">{{ field.help }}</p>
               </div>
             </div>
           </div>
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" @click="closeInstallModal">取消</button>
+          <button class="btn-secondary" @click="closeConfigModal">取消</button>
           <button
             class="btn-primary"
-            :disabled="!allDependenciesMet"
-            @click="confirmInstall"
+            :disabled="!isConfigValid"
+            @click="saveConfig"
           >
-            确认安装
+            保存配置
           </button>
         </div>
       </div>
@@ -175,128 +168,162 @@ export default {
   },
   setup() {
     const loading = ref(false);
-    const availableServices = ref([]);
-    const showInstallModal = ref(false);
+    const systemServices = ref([]);
+    const showConfigModal = ref(false);
     const selectedService = ref(null);
-    const dependencyStatus = ref({});
+    const configData = ref({});
 
-    // 计算已安装的服务
-    const installedServices = computed(() => {
-      return availableServices.value.filter(service => service.installed);
-    });
+    // V3.0: 定义核心系统服务
+    const coreServices = [
+      {
+        id: 'container-management',
+        name: '容器管理',
+        description: '管理Docker/Podman容器，提供容器生命周期管理能力',
+        type: '核心服务',
+        icon: ContainerIcon,
+        configFields: [
+          {
+            name: 'driver',
+            label: '容器驱动',
+            type: 'select',
+            options: [
+              { value: 'docker', label: 'Docker' },
+              { value: 'podman', label: 'Podman' }
+            ],
+            help: '选择容器运行时驱动'
+          },
+          {
+            name: 'socketPath',
+            label: 'Socket路径',
+            type: 'text',
+            placeholder: '/var/run/docker.sock',
+            help: '容器守护进程的socket路径'
+          }
+        ]
+      },
+      {
+        id: 'backup-management',
+        name: '备份管理',
+        description: '提供数据备份和恢复功能，支持多种存储后端',
+        type: '核心服务',
+        icon: DatabaseIcon,
+        configFields: [
+          {
+            name: 'storageBackend',
+            label: '存储后端',
+            type: 'select',
+            options: [
+              { value: 'feishu', label: '飞书云盘' },
+              { value: 'local', label: '本地存储' }
+            ],
+            help: '选择备份存储后端'
+          },
+          {
+            name: 'retentionDays',
+            label: '保留天数',
+            type: 'text',
+            placeholder: '30',
+            help: '备份文件保留天数'
+          }
+        ]
+      }
+    ];
 
-    // 计算所有依赖是否满足
-    const allDependenciesMet = computed(() => {
+    // 计算配置是否有效
+    const isConfigValid = computed(() => {
       if (!selectedService.value) return false;
-      return selectedService.value.dependencies.every(dep => dependencyStatus.value[dep]);
+      return selectedService.value.configFields.every(field => {
+        if (field.required) {
+          return configData.value[field.name] && configData.value[field.name].trim() !== '';
+        }
+        return true;
+      });
     });
 
-    // 获取系统服务列表
+    // V3.0: 获取系统服务状态
     async function fetchServices() {
       loading.value = true;
       try {
-        const res = await fetch('/api/services');
-        if (!res.ok) {
-          throw new Error('无法获取系统服务列表');
-        }
-        const data = await res.json();
-        if (data.success) {
-          availableServices.value = data.data || [];
-        } else {
-          alert('获取系统服务列表失败: ' + data.error);
-        }
+        // 获取服务配置状态
+        const res = await fetch('/api/services/status');
+        const statusData = res.ok ? await res.json() : { data: {} };
+        
+        // 合并核心服务和状态信息
+        systemServices.value = coreServices.map(service => ({
+          ...service,
+          configured: statusData.data[service.id]?.configured || false,
+          status: statusData.data[service.id]?.status || '未配置',
+          configuring: false
+        }));
       } catch (err) {
         console.error(err);
-        alert('获取系统服务列表失败: ' + err.message);
+        // 如果API失败，使用默认状态
+        systemServices.value = coreServices.map(service => ({
+          ...service,
+          configured: false,
+          status: '未配置',
+          configuring: false
+        }));
       } finally {
         loading.value = false;
       }
     }
 
-    // 检查依赖状态
-    async function checkDependencies(dependencies) {
-      const status = {};
-      for (const dep of dependencies) {
-        try {
-          const res = await fetch(`/api/services/check-dependency/${dep}`);
-          status[dep] = res.ok && (await res.json()).success;
-        } catch {
-          status[dep] = false;
-        }
-      }
-      dependencyStatus.value = status;
-    }
-
-    // 安装服务
-    async function installService(service) {
+    // V3.0: 配置服务
+    async function configureService(service) {
       selectedService.value = service;
       
-      // 检查依赖
-      if (service.dependencies.length > 0) {
-        await checkDependencies(service.dependencies);
+      // 获取现有配置
+      try {
+        const res = await fetch(`/api/services/${service.id}/config`);
+        if (res.ok) {
+          const data = await res.json();
+          configData.value = data.config || {};
+        } else {
+          configData.value = {};
+        }
+      } catch (err) {
+        console.error('获取配置失败:', err);
+        configData.value = {};
       }
       
-      showInstallModal.value = true;
+      showConfigModal.value = true;
     }
 
-    // 确认安装
-    async function confirmInstall() {
-      if (!selectedService.value) return;
+    // V3.0: 保存配置
+    async function saveConfig() {
+      if (!selectedService.value || !isConfigValid.value) return;
       
       try {
-        const res = await fetch(`/api/services/${selectedService.value.id}/install`, {
-          method: 'POST'
+        const res = await fetch(`/api/services/${selectedService.value.id}/config`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            config: configData.value
+          })
         });
         
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || '安装服务失败');
+          throw new Error(data.error || '保存配置失败');
         }
         
-        alert('服务安装成功！请刷新页面以查看新功能。');
-        closeInstallModal();
+        alert('配置保存成功！');
+        closeConfigModal();
         await fetchServices();
       } catch (err) {
         console.error(err);
-        alert('安装服务失败: ' + err.message);
+        alert('保存配置失败: ' + err.message);
       }
     }
 
-    // 卸载服务
-    async function uninstallService(service) {
-      if (!confirm(`确定要卸载服务「${service.name}」吗？`)) {
-        return;
-      }
-      
-      try {
-        const res = await fetch(`/api/services/${service.id}/uninstall`, {
-          method: 'POST'
-        });
-        
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || '卸载服务失败');
-        }
-        
-        alert('服务卸载成功！请刷新页面。');
-        await fetchServices();
-      } catch (err) {
-        console.error(err);
-        alert('卸载服务失败: ' + err.message);
-      }
-    }
-
-    // 打开服务
-    function openService(service) {
-      // 这里可以触发导航到对应的服务页面
-      alert(`打开服务「${service.name}」功能即将上线`);
-    }
-
-    // 关闭安装模态框
-    function closeInstallModal() {
-      showInstallModal.value = false;
+    // V3.0: 关闭配置模态框
+    function closeConfigModal() {
+      showConfigModal.value = false;
       selectedService.value = null;
-      dependencyStatus.value = {};
+      configData.value = {};
     }
 
     onMounted(() => {
@@ -305,17 +332,14 @@ export default {
 
     return {
       loading,
-      availableServices,
-      installedServices,
-      showInstallModal,
+      systemServices,
+      showConfigModal,
       selectedService,
-      dependencyStatus,
-      allDependenciesMet,
-      installService,
-      confirmInstall,
-      uninstallService,
-      openService,
-      closeInstallModal
+      configData,
+      isConfigValid,
+      configureService,
+      saveConfig,
+      closeConfigModal
     };
   }
 };
@@ -407,12 +431,12 @@ export default {
   font-weight: 500;
 }
 
-.status-badge.installed {
+.status-badge.configured {
   background: rgba(16, 185, 129, 0.2);
   color: #10b981;
 }
 
-.status-badge.not-installed {
+.status-badge.not-configured {
   background: rgba(107, 114, 128, 0.2);
   color: #6b7280;
 }
@@ -435,7 +459,7 @@ export default {
   gap: 8px;
 }
 
-.install-btn {
+.configure-btn {
   flex: 1;
   background: #0ea5e9;
   color: #0f172a;
@@ -450,35 +474,11 @@ export default {
   justify-content: center;
 }
 
-.install-btn:hover:not(:disabled) {
+.configure-btn:hover:not(:disabled) {
   background: #0284c7;
 }
 
-.install-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.uninstall-btn {
-  flex: 1;
-  background: transparent;
-  color: #ef4444;
-  border: 1px solid #ef4444;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.uninstall-btn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.uninstall-btn:disabled {
+.configure-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -620,4 +620,47 @@ export default {
 .btn-secondary:hover {
   background: #1e293b;
 }
+
+.config-form {
+  space-y: 16px;
+}
+
+.form-field {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #e2e8f0;
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #e2e8f0;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #0ea5e9;
+}
+
+.form-input::placeholder {
+  color: #64748b;
+}
+
+.form-help {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
 </style>
+

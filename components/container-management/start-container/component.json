@@ -1,0 +1,28 @@
+{
+  "name": "start-container",
+  "version": "1.0.0",
+  "description": "启动容器",
+  "type": "local",
+  "inputs": {
+    "containerId": {
+      "type": "string",
+      "description": "容器ID或名称",
+      "required": true
+    },
+    "driver": {
+      "type": "string",
+      "description": "容器驱动 (docker/podman)",
+      "default": "docker"
+    }
+  },
+  "outputs": {
+    "success": {
+      "type": "boolean",
+      "description": "是否启动成功"
+    },
+    "message": {
+      "type": "string",
+      "description": "操作结果消息"
+    }
+  }
+}

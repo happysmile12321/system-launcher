@@ -1,7 +1,11 @@
 import { info, success, error, warning } from '../utils/logger.js';
-import ContainerService from '../core/container/index.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { fork } from 'child_process';
+import { writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { v4 as uuidv4 } from 'uuid';
 
 const execAsync = promisify(exec);
 
@@ -61,7 +65,7 @@ class ContainerManagementService {
   }
 
   /**
-   * 获取容器列表
+   * V3.0: 通过官方组件获取容器列表
    */
   async getContainers() {
     try {
@@ -71,19 +75,27 @@ class ContainerManagementService {
         return [];
       }
 
-      const containers = await ContainerService.list();
-      
-      // 格式化容器数据
-      return containers.map(container => ({
-        id: container.ID || container.id,
-        name: container.Names || container.name,
-        image: container.Image || container.image,
-        status: container.Status || container.status,
-        state: container.State || container.state,
-        created: container.CreatedAt || container.created,
-        ports: this.parsePorts(container.Ports || container.ports),
-        size: container.Size || container.size
-      }));
+      // 使用官方组件执行容器列表命令
+      const result = await this.executeComponent('local:container-management/list-containers', {
+        driver: this.currentDriver,
+        all: true
+      });
+
+      if (result.success && result.outputs.containers) {
+        const containers = JSON.parse(result.outputs.containers);
+        return containers.map(container => ({
+          id: container.ID || container.id,
+          name: container.Names || container.name,
+          image: container.Image || container.image,
+          status: container.Status || container.status,
+          state: container.State || container.state,
+          created: container.CreatedAt || container.created,
+          ports: this.parsePorts(container.Ports || container.ports),
+          size: container.Size || container.size
+        }));
+      }
+
+      return [];
     } catch (err) {
       error(`Failed to get containers: ${err.message}`);
       return [];
@@ -108,7 +120,7 @@ class ContainerManagementService {
   }
 
   /**
-   * 启动容器
+   * V3.0: 通过官方组件启动容器
    */
   async startContainer(containerId) {
     try {
@@ -118,9 +130,18 @@ class ContainerManagementService {
         throw new Error('No container runtime available');
       }
 
-      const result = await ContainerService.start({ name: containerId });
-      success(`Started container: ${containerId}`);
-      return result;
+      // 使用官方组件执行启动命令
+      const result = await this.executeComponent('local:container-management/start-container', {
+        containerId,
+        driver: this.currentDriver
+      });
+
+      if (result.success) {
+        success(`Started container: ${containerId}`);
+        return { success: true, message: result.outputs.message };
+      } else {
+        throw new Error(result.outputs.message || 'Failed to start container');
+      }
     } catch (err) {
       error(`Failed to start container ${containerId}: ${err.message}`);
       throw err;
@@ -128,7 +149,7 @@ class ContainerManagementService {
   }
 
   /**
-   * 停止容器
+   * V3.0: 通过官方组件停止容器
    */
   async stopContainer(containerId) {
     try {
@@ -138,9 +159,19 @@ class ContainerManagementService {
         throw new Error('No container runtime available');
       }
 
-      const result = await ContainerService.stop(containerId);
-      success(`Stopped container: ${containerId}`);
-      return result;
+      // 使用官方组件执行停止命令
+      const result = await this.executeComponent('local:container-management/stop-container', {
+        containerId,
+        driver: this.currentDriver,
+        timeout: 10
+      });
+
+      if (result.success) {
+        success(`Stopped container: ${containerId}`);
+        return { success: true, message: result.outputs.message };
+      } else {
+        throw new Error(result.outputs.message || 'Failed to stop container');
+      }
     } catch (err) {
       error(`Failed to stop container ${containerId}: ${err.message}`);
       throw err;
@@ -246,6 +277,97 @@ class ContainerManagementService {
     } catch (err) {
       return false;
     }
+  }
+
+  /**
+   * V3.0: 执行官方组件
+   */
+  async executeComponent(componentPath, inputs = {}) {
+    return new Promise((resolve, reject) => {
+      try {
+        // 创建临时文件存储输入参数
+        const tempFile = join(tmpdir(), `container-component-${uuidv4()}.json`);
+        const componentData = {
+          inputs: JSON.stringify(inputs),
+          outputs: {},
+          log: {
+            info: (msg) => info(`[Component] ${msg}`),
+            warn: (msg) => warning(`[Component] ${msg}`),
+            error: (msg) => error(`[Component] ${msg}`)
+          }
+        };
+
+        writeFileSync(tempFile, JSON.stringify(componentData));
+
+        // 解析组件路径
+        const [type, path] = componentPath.split(':');
+        const componentDir = join(process.cwd(), 'components', path);
+        const componentFile = join(componentDir, 'index.js');
+
+        // 创建子进程执行组件
+        const child = fork(componentFile, [], {
+          cwd: componentDir,
+          stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+          env: {
+            ...process.env,
+            inputs: JSON.stringify(inputs)
+          }
+        });
+
+        let output = '';
+        let errorOutput = '';
+
+        child.stdout.on('data', (data) => {
+          output += data.toString();
+        });
+
+        child.stderr.on('data', (data) => {
+          errorOutput += data.toString();
+        });
+
+        child.on('close', (code) => {
+          // 清理临时文件
+          try {
+            unlinkSync(tempFile);
+          } catch (e) {
+            // 忽略清理错误
+          }
+
+          if (code === 0) {
+            try {
+              // 尝试解析输出
+              const result = JSON.parse(output);
+              resolve({
+                success: true,
+                outputs: result.outputs || {},
+                logs: output
+              });
+            } catch (parseErr) {
+              resolve({
+                success: true,
+                outputs: {},
+                logs: output
+              });
+            }
+          } else {
+            reject(new Error(`Component execution failed with code ${code}: ${errorOutput}`));
+          }
+        });
+
+        child.on('error', (err) => {
+          reject(new Error(`Component execution error: ${err.message}`));
+        });
+
+        // 设置超时
+        setTimeout(() => {
+          child.kill();
+          reject(new Error('Component execution timeout'));
+        }, 30000);
+
+      } catch (err) {
+        reject(err);
+      }
+    });
   }
 
   /**

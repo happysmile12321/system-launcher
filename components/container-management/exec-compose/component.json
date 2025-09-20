@@ -1,0 +1,37 @@
+{
+  "name": "exec-compose",
+  "version": "1.0.0",
+  "description": "执行docker-compose命令",
+  "type": "local",
+  "inputs": {
+    "command": {
+      "type": "string",
+      "description": "compose命令 (up, down, ps, logs等)",
+      "required": true
+    },
+    "file": {
+      "type": "string",
+      "description": "compose文件路径",
+      "default": "docker-compose.yml"
+    },
+    "projectName": {
+      "type": "string",
+      "description": "项目名称"
+    },
+    "detached": {
+      "type": "boolean",
+      "description": "是否后台运行",
+      "default": true
+    }
+  },
+  "outputs": {
+    "success": {
+      "type": "boolean",
+      "description": "是否执行成功"
+    },
+    "output": {
+      "type": "string",
+      "description": "命令输出"
+    }
+  }
+}
