@@ -20,6 +20,8 @@ import containerBackupRouter, { initializeContainerBackupService } from './route
 import aiCronRouter from './routes/aiCron.js';
 import backupManagementRouter from './routes/backupManagement.js';
 import compositionsRouter from './routes/compositions.js';
+import localFSRouter from './routes/localFS.js';
+import workflowProxyRouter from './routes/workflowProxy.js';
 import feishuWebSocketService from '../services/feishuWebSocketService.js';
 import {
   listWorkflows,
@@ -368,6 +370,12 @@ app.use('/api/ai-cron', aiCronRouter);
 // Backup Management API Route
 app.use('/api/backup-management', backupManagementRouter);
 app.use('/api/compositions', compositionsRouter);
+
+// LocalFS API Route
+app.use('/api/local-fs', localFSRouter);
+
+// Workflow Proxy API Route
+app.use('/api/workflow-proxy', workflowProxyRouter);
 
 
 // --- Server Startup ---

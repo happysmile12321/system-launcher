@@ -1,11 +1,11 @@
+# LocalFS managed directories
+/backup/
+
 # Dependencies
 node_modules
-
 # Environment variables
 .env
-
 # Local App Configuration
 .orchestrator.config.json
-
 # Logs
 *.log
