@@ -17,7 +17,42 @@ class GitFS {
     if (!this.config || !this.config.github || !this.config.github.token) {
       throw new Error('GitHub token is not configured.');
     }
-    this.octokit = new Octokit({ auth: this.config.github.token });
+
+    // 对于 Fine-grained PAT，需要使用 Bearer 认证
+    const token = this.config.github.token;
+    const isFineGrainedToken = token.startsWith('github_pat_');
+    const authHeader = isFineGrainedToken ? `Bearer ${token}` : token;
+
+    this.octokit = new Octokit({
+      auth: authHeader,
+      // 添加请求日志
+      log: {
+        debug: (message, additionalInfo) => {
+          info(`[GitFS Debug] ${message}`);
+          if (additionalInfo) {
+            console.log(JSON.stringify(additionalInfo, null, 2));
+          }
+        },
+        info: (message, additionalInfo) => {
+          info(`[GitFS Info] ${message}`);
+          if (additionalInfo) {
+            console.log(JSON.stringify(additionalInfo, null, 2));
+          }
+        },
+        warn: (message, additionalInfo) => {
+          warning(`[GitFS Warning] ${message}`);
+          if (additionalInfo) {
+            console.log(JSON.stringify(additionalInfo, null, 2));
+          }
+        },
+        error: (message, additionalInfo) => {
+          error(`[GitFS Error] ${message}`);
+          if (additionalInfo) {
+            console.log(JSON.stringify(additionalInfo, null, 2));
+          }
+        }
+      }
+    });
   }
 
   /**
@@ -38,7 +73,7 @@ class GitFS {
   getV3Path(type, path = '') {
     const v3Paths = {
       workflows: 'workflows',
-      components: 'components', 
+      components: 'components',
       triggers: 'triggers',
       containers: 'containers',
       feishu: 'feishu',
@@ -46,11 +81,11 @@ class GitFS {
       backups: 'backups',
       recovery: 'recovery'
     };
-    
+
     if (!v3Paths[type]) {
       throw new Error(`Unknown V3 path type: ${type}`);
     }
-    
+
     const basePath = v3Paths[type];
     return path ? `${basePath}/${path}` : basePath;
   }
@@ -62,7 +97,7 @@ class GitFS {
     try {
       const fullPath = this.getFullPath(path);
       info(`Listing directory: ${fullPath}`);
-      
+
       const { data } = await this.octokit.rest.repos.getContent({
         owner: this.config.github.owner,
         repo: this.config.github.repo,
@@ -99,7 +134,7 @@ class GitFS {
     try {
       const fullPath = this.getFullPath(path);
       info(`Reading file: ${fullPath}`);
-      
+
       const { data } = await this.octokit.rest.repos.getContent({
         owner: this.config.github.owner,
         repo: this.config.github.repo,
@@ -133,7 +168,7 @@ class GitFS {
     try {
       const fullPath = this.getFullPath(path);
       info(`Writing file: ${fullPath}`);
-      
+
       // 检查文件是否存在
       let sha = null;
       try {
@@ -148,7 +183,7 @@ class GitFS {
       }
 
       const encodedContent = Buffer.from(content).toString('base64');
-      
+
       await this.octokit.rest.repos.createOrUpdateFileContents({
         owner: this.config.github.owner,
         repo: this.config.github.repo,
@@ -172,14 +207,14 @@ class GitFS {
     try {
       const fullPath = this.getFullPath(path);
       info(`Deleting file: ${fullPath}`);
-      
+
       // 获取文件的sha
       const fileData = await this.octokit.rest.repos.getContent({
         owner: this.config.github.owner,
         repo: this.config.github.repo,
         path: fullPath
       });
-      
+
       await this.octokit.rest.repos.deleteFile({
         owner: this.config.github.owner,
         repo: this.config.github.repo,
@@ -202,10 +237,10 @@ class GitFS {
     try {
       const fullPath = this.getFullPath(path);
       info(`Creating directory: ${fullPath}`);
-      
+
       // GitHub 通过文件路径隐式创建目录，所以我们创建一个占位文件
       const placeholderPath = `${fullPath}/.gitkeep`;
-      
+
       // 检查文件是否存在以获取SHA
       let sha = null;
       try {
@@ -218,7 +253,7 @@ class GitFS {
       } catch (err) {
         // 文件不存在，继续创建
       }
-      
+
       await this.octokit.rest.repos.createOrUpdateFileContents({
         owner: this.config.github.owner,
         repo: this.config.github.repo,
@@ -261,7 +296,7 @@ class GitFS {
   async initializeV3Structure() {
     const v3Directories = [
       'workflows',
-      'components', 
+      'components',
       'triggers',
       'containers',
       'feishu',
@@ -287,12 +322,12 @@ class GitFS {
    */
   async migrateToV3() {
     info('V3.0: Starting migration from old config structure...');
-    
+
     try {
       // 迁移工作流配置
       const oldWorkflowsPath = 'config/workflows';
       const newWorkflowsPath = this.getV3Path('workflows');
-      
+
       if (await this.exists(oldWorkflowsPath)) {
         const workflows = await this.listDirectory(oldWorkflowsPath);
         for (const workflow of workflows) {
@@ -311,7 +346,7 @@ class GitFS {
       // 迁移触发器配置
       const oldTriggersPath = 'config/triggers';
       const newTriggersPath = this.getV3Path('triggers');
-      
+
       if (await this.exists(oldTriggersPath)) {
         const triggers = await this.listDirectory(oldTriggersPath);
         for (const trigger of triggers) {
@@ -330,7 +365,7 @@ class GitFS {
       // 迁移系统服务配置
       const oldServicesPath = 'config/services';
       const newServicesPath = this.getV3Path('system_services');
-      
+
       if (await this.exists(oldServicesPath)) {
         const services = await this.listDirectory(oldServicesPath);
         for (const service of services) {

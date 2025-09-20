@@ -19,22 +19,62 @@ export class GitHubTokenValidator {
                 return { valid: false, error: 'Missing required parameters' };
             }
 
+            // 对于 Fine-grained PAT，需要使用 Bearer 认证
+            const isFineGrainedToken = token.startsWith('github_pat_');
+            const authHeader = isFineGrainedToken ? `Bearer ${token}` : token;
+
             const octokit = new Octokit({
-                auth: token,
+                auth: authHeader,
                 request: {
                     headers: {
                         'Accept': 'application/vnd.github.v3+json',
                         'User-Agent': 'Orchestrator-Pro/1.0'
                     }
+                },
+                // 添加请求日志
+                log: {
+                    debug: (message, additionalInfo) => {
+                        info(`[GitHub API Debug] ${message}`);
+                        if (additionalInfo) {
+                            console.log(JSON.stringify(additionalInfo, null, 2));
+                        }
+                    },
+                    info: (message, additionalInfo) => {
+                        info(`[GitHub API Info] ${message}`);
+                        if (additionalInfo) {
+                            console.log(JSON.stringify(additionalInfo, null, 2));
+                        }
+                    },
+                    warn: (message, additionalInfo) => {
+                        warning(`[GitHub API Warning] ${message}`);
+                        if (additionalInfo) {
+                            console.log(JSON.stringify(additionalInfo, null, 2));
+                        }
+                    },
+                    error: (message, additionalInfo) => {
+                        error(`[GitHub API Error] ${message}`);
+                        if (additionalInfo) {
+                            console.log(JSON.stringify(additionalInfo, null, 2));
+                        }
+                    }
                 }
             });
 
             // 检查token类型
-            const isFineGrainedToken = token.startsWith('github_pat_');
             info(`Token type: ${isFineGrainedToken ? 'Fine-grained PAT' : 'Classic PAT'}`);
 
             // 对于Fine-grained token，需要特殊处理
             if (isFineGrainedToken) {
+                // 首先测试用户认证
+                try {
+                    info('GitHub token validation: Testing user authentication...');
+                    const user = await octokit.rest.users.getAuthenticated();
+                    info(`GitHub token validation: User authenticated as ${user.data.login}`);
+                } catch (err) {
+                    error(`GitHub token validation failed: User authentication failed - ${err.message}`);
+                    return { valid: false, error: `Invalid token or authentication failed: ${err.message}` };
+                }
+
                 // 如果跳过仓库检查，只验证token有效性
                 if (skipRepoCheck) {
                     info('GitHub token validation: Skipping repository check for Fine-grained PAT');
@@ -44,44 +84,44 @@ export class GitHubTokenValidator {
                 // 对于Fine-grained PAT，我们使用重试机制
                 let lastError = null;
                 const maxRetries = 3;
-                
+
                 for (let attempt = 1; attempt <= maxRetries; attempt++) {
                     try {
                         info(`GitHub token validation: Testing repository access for ${owner}/${repo} (attempt ${attempt}/${maxRetries})`);
-                        
+
                         // 使用更长的超时时间，因为网络可能较慢
-                        const timeoutPromise = new Promise((_, reject) => 
-                            setTimeout(() => reject(new Error('Repository access timeout')), 15000)
+                        const timeoutPromise = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('Repository access timeout')), 20000)
                         );
-                        
+
                         const repoPromise = octokit.rest.repos.get({
                             owner,
                             repo
                         });
-                        
+
                         const repoData = await Promise.race([repoPromise, timeoutPromise]);
                         info(`GitHub token validation: Repository access confirmed for ${repoData.data.full_name}`);
                         info(`Repository visibility: ${repoData.data.private ? 'Private' : 'Public'}`);
-                        
+
                         return { valid: true };
                     } catch (err) {
                         lastError = err;
                         error(`GitHub token validation attempt ${attempt} failed: ${err.message}`);
-                        
+
                         if (attempt < maxRetries) {
-                            info(`Retrying in 2 seconds...`);
-                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            info(`Retrying in 3 seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, 3000));
                         }
                     }
                 }
-                
+
                 // 所有重试都失败了
                 error(`GitHub token validation failed after ${maxRetries} attempts`);
                 error(`Error status: ${lastError.status}`);
                 error(`Error message: ${lastError.message}`);
-                
+
                 if (lastError.message.includes('timeout')) {
-                    return { valid: false, error: `Repository access timeout after ${maxRetries} attempts. Please check your network connection.` };
+                    return { valid: false, error: `Repository access timeout after ${maxRetries} attempts. Please check your network connection and repository permissions.` };
                 } else if (lastError.status === 404) {
                     return { valid: false, error: `Repository ${owner}/${repo} not found. Please check if the repository exists and your token has access to it.` };
                 } else if (lastError.status === 403) {
